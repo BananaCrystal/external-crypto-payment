@@ -37,19 +37,28 @@ export default function StoreIntegration() {
   useEffect(() => {
     const fetchRate = async () => {
       if (!formData.amount || !formData.currency) return;
-
+  
       try {
         setLoading(true);
         setError(null);
+        
+        // ExchangeRate-API (free tier)
         const response = await fetch(
-          `https://fxrateservice.vercel.app/api/bananacrystal-rate?from=USD&to=${formData.currency}`
+          `https://open.er-api.com/v6/latest/USD`
         );
-        const data: Rate = await response.json();
-
-        if (data.bananaCrystalRate) {
-          const amountInUsd =
-            parseFloat(formData.amount) / data.bananaCrystalRate;
+        const data = await response.json();
+  
+        if (data.rates && data.rates[formData.currency]) {
+          // ExchangeRate-API returns rates relative to base currency (USD)
+          const exchangeRate = data.rates[formData.currency];
+          // Calculate the banana crystal rate (assuming original rate was USD to target currency)
+          const bananaCrystalRate = exchangeRate;
+          
+          const amountInUsd = parseFloat(formData.amount) / bananaCrystalRate;
           setUsdAmount(amountInUsd);
+        } else {
+          setError(`Currency ${formData.currency} not supported.`);
+          setUsdAmount(null);
         }
       } catch (err) {
         setError("Failed to fetch currency rate. Please try again.");
@@ -58,7 +67,7 @@ export default function StoreIntegration() {
         setLoading(false);
       }
     };
-
+  
     fetchRate();
   }, [formData.amount, formData.currency]);
 
