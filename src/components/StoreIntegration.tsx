@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { CURRENCIES } from '@/constants';
-import { useState, useEffect } from 'react';
+import { CURRENCIES } from "@/constants";
+import { useState, useEffect } from "react";
 
 interface StoreDetails {
   store_id: string;
@@ -19,38 +19,40 @@ interface Rate {
   confidence: number;
 }
 
-
 export default function StoreIntegration() {
   const [formData, setFormData] = useState<StoreDetails>({
-    store_id: '',
-    wallet_address: '',
-    amount: '',
-    currency: 'NGN',
-    description: '',
-    redirect_url: '',
+    store_id: "",
+    wallet_address: "",
+    amount: "",
+    currency: "NGN",
+    description: "",
+    redirect_url: "",
   });
-  const [generatedLink, setGeneratedLink] = useState<string>('');
+  const [generatedLink, setGeneratedLink] = useState<string>("");
   const [usdAmount, setUsdAmount] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [countryCode, setCountryCode] = useState('+234');
+  const [countryCode, setCountryCode] = useState("+234");
 
   useEffect(() => {
     const fetchRate = async () => {
       if (!formData.amount || !formData.currency) return;
-      
+
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`https://fxrateservice.vercel.app/api/bananacrystal-rate?from=USD&to=${formData.currency}`);
+        const response = await fetch(
+          `https://fxrateservice.vercel.app/api/bananacrystal-rate?from=USD&to=${formData.currency}`
+        );
         const data: Rate = await response.json();
-        
+
         if (data.bananaCrystalRate) {
-          const amountInUsd = parseFloat(formData.amount) / data.bananaCrystalRate;
+          const amountInUsd =
+            parseFloat(formData.amount) / data.bananaCrystalRate;
           setUsdAmount(amountInUsd);
         }
       } catch (err) {
-        setError('Failed to fetch currency rate. Please try again.');
+        setError("Failed to fetch currency rate. Please try again.");
         setUsdAmount(null);
       } finally {
         setLoading(false);
@@ -62,9 +64,9 @@ export default function StoreIntegration() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!usdAmount) {
-      setError('Please wait for currency conversion to complete');
+      setError("Please wait for currency conversion to complete");
       return;
     }
 
@@ -76,36 +78,48 @@ export default function StoreIntegration() {
       description: formData.description,
       redirect_url: formData.redirect_url,
       usd_amount: usdAmount.toFixed(2),
-      wallet_address: formData.wallet_address
+      wallet_address: formData.wallet_address,
     });
-    
+
     const link = `${baseUrl}/pay?${params.toString()}`;
     setGeneratedLink(link);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
-  const baseInputClasses = "w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-400";
-  const baseSelectClasses = "w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 bg-white";
+  const baseInputClasses =
+    "w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-400";
+  const baseSelectClasses =
+    "w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 bg-white";
 
   return (
     <div className="max-w-md w-full mx-auto bg-white rounded-xl shadow-2xl p-8 transform transition-all duration-500">
-      <h2 className="text-3xl font-bold mb-8 text-gray-900 text-center">Generate Payment Link</h2>
-      
+      <h2 className="text-3xl font-bold mb-8 text-gray-900 text-center">
+        Generate Payment Link
+      </h2>
+
       <div className="bg-purple-50 rounded-lg p-6 mb-8">
         <p className="text-gray-900">
-          Enter your store details and payment information to generate a payment link.
+          Enter your store details and payment information to generate a payment
+          link.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label htmlFor="store_id" className="block text-gray-900 mb-2 font-medium">Store ID</label>
+          <label
+            htmlFor="store_id"
+            className="block text-gray-900 mb-2 font-medium"
+          >
+            Store ID
+          </label>
           <input
             type="text"
             id="store_id"
@@ -122,8 +136,11 @@ export default function StoreIntegration() {
         </div>
 
         <div>
-          <label htmlFor="wallet_address" className="block text-gray-900 mb-2 font-medium">
-            USDT Wallet Address (Polygon)
+          <label
+            htmlFor="wallet_address"
+            className="block text-gray-900 mb-2 font-medium"
+          >
+            Store USDT Wallet Address (Polygon)
           </label>
           <input
             type="text"
@@ -136,13 +153,19 @@ export default function StoreIntegration() {
             placeholder="0x..."
           />
           <p className="text-sm text-gray-500 mt-1">
-            Your USDT wallet address on the Polygon network where payments will be sent
+            Your USDT wallet address on the Polygon network where payments will
+            be sent
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor="amount" className="block text-gray-900 mb-2 font-medium">Amount</label>
+            <label
+              htmlFor="amount"
+              className="block text-gray-900 mb-2 font-medium"
+            >
+              Amount
+            </label>
             <input
               type="number"
               id="amount"
@@ -156,9 +179,14 @@ export default function StoreIntegration() {
               placeholder="0.00"
             />
           </div>
-          
+
           <div>
-            <label htmlFor="currency" className="block text-gray-900 mb-2 font-medium">Currency</label>
+            <label
+              htmlFor="currency"
+              className="block text-gray-900 mb-2 font-medium"
+            >
+              Currency
+            </label>
             <select
               id="currency"
               name="currency"
@@ -167,7 +195,7 @@ export default function StoreIntegration() {
               onChange={handleInputChange}
               value={formData.currency}
             >
-              {CURRENCIES.map(currency => (
+              {CURRENCIES.map((currency) => (
                 <option key={currency.code} value={currency.code}>
                   {currency.code} - {currency.name}
                 </option>
@@ -179,7 +207,8 @@ export default function StoreIntegration() {
         {usdAmount && (
           <div className="bg-blue-50 p-4 rounded-lg">
             <p className="text-blue-800 text-sm">
-              Equivalent in USD: <span className="font-bold">${usdAmount.toFixed(2)}</span>
+              Equivalent in USD:{" "}
+              <span className="font-bold">${usdAmount.toFixed(2)}</span>
             </p>
           </div>
         )}
@@ -193,7 +222,12 @@ export default function StoreIntegration() {
         )}
 
         <div>
-          <label htmlFor="description" className="block text-gray-900 mb-2 font-medium">Payment Description</label>
+          <label
+            htmlFor="description"
+            className="block text-gray-900 mb-2 font-medium"
+          >
+            Payment Description
+          </label>
           <input
             type="text"
             id="description"
@@ -207,7 +241,10 @@ export default function StoreIntegration() {
         </div>
 
         <div>
-          <label htmlFor="redirect_url" className="block text-gray-900 mb-2 font-medium">
+          <label
+            htmlFor="redirect_url"
+            className="block text-gray-900 mb-2 font-medium"
+          >
             Redirect URL (Optional)
           </label>
           <input
@@ -232,13 +269,25 @@ export default function StoreIntegration() {
           {loading ? (
             <span className="flex items-center justify-center gap-2">
               <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  fill="none"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
               </svg>
               Calculating...
             </span>
           ) : (
-            'Generate Payment Link'
+            "Generate Payment Link"
           )}
         </button>
       </form>
@@ -250,7 +299,7 @@ export default function StoreIntegration() {
             <button
               onClick={() => {
                 navigator.clipboard.writeText(generatedLink);
-                alert('Payment link copied to clipboard!');
+                alert("Payment link copied to clipboard!");
               }}
               className="text-purple-600 hover:text-purple-800 text-sm font-medium"
             >
