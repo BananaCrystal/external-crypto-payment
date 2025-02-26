@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./styles.css";
 import { PaymentFormProps, PaymentDetails } from "./types";
 import { COUNTRY_CODES, FEE_PERCENTAGE } from "./constants";
@@ -15,14 +15,46 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   onError,
   isOpen = false,
   onClose,
+  modalPosition = "center",
+  modalSize = "default",
+  theme = {
+    primaryColor: "purple-800",
+    secondaryColor: "blue-50",
+    textColor: "gray-900",
+    backgroundColor: "white",
+  },
 }) => {
   // If the modal is not open, don't render anything
   if (!isOpen) return null;
+  
+  // Reference to the modal content
+  const modalRef = useRef<HTMLDivElement>(null);
   
   // Handle close button click
   const handleClose = () => {
     if (onClose) onClose();
   };
+  
+  // Handle click outside the modal
+  const handleOutsideClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+      handleClose();
+    }
+  };
+  
+  // Handle escape key press
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    
+    document.addEventListener('keydown', handleEscKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscKey);
+    };
+  }, []);
 
   const [step, setStep] = useState(1);
   const [usdAmount, setUsdAmount] = useState<number | null>(null);
@@ -273,11 +305,57 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   const baseButtonClasses =
     "w-full bg-purple-800 text-white py-4 rounded-lg transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] hover:bg-purple-900 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none";
 
+  // Get modal position classes
+  const getPositionClasses = () => {
+    switch (modalPosition) {
+      case "top":
+        return "items-start pt-16";
+      case "bottom":
+        return "items-end pb-16";
+      case "center":
+      default:
+        return "items-center";
+    }
+  };
+  
+  // Get modal size classes
+  const getSizeClasses = () => {
+    switch (modalSize) {
+      case "small":
+        return "max-w-sm";
+      case "large":
+        return "max-w-lg";
+      case "full":
+        return "max-w-full mx-4 sm:mx-8";
+      case "default":
+      default:
+        return "max-w-md";
+    }
+  };
+  
+  // Get theme color classes
+  const getThemeClasses = () => {
+    return {
+      primary: `bg-${theme.primaryColor} hover:bg-${theme.primaryColor.replace(/(-\d+)$/, (m: string) => `-${parseInt(m.substring(1)) + 100}`)} text-white`,
+      secondary: `bg-${theme.secondaryColor}`,
+      text: `text-${theme.textColor}`,
+      background: `bg-${theme.backgroundColor}`,
+    };
+  };
+  
+  const themeClasses = getThemeClasses();
+  
   // Modal overlay and content for step 1
   if (step === 1) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 animate-fade-in">
-        <div className="relative max-w-md w-full mx-auto bg-white rounded-xl shadow-2xl p-8 transform transition-all duration-500 animate-slide-up">
+      <div 
+        className={`fixed inset-0 z-50 flex justify-center p-4 bg-black bg-opacity-50 animate-fade-in ${getPositionClasses()}`}
+        onClick={handleOutsideClick}
+      >
+        <div 
+          ref={modalRef}
+          className={`relative ${getSizeClasses()} w-full mx-auto ${themeClasses.background} rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500 animate-slide-up overflow-auto max-h-[90vh]`}
+        >
           <button 
             onClick={handleClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -288,21 +366,21 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             </svg>
           </button>
           
-          <h2 className="text-3xl font-bold mb-8 text-gray-900 text-center">
+          <h2 className={`text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 ${themeClasses.text} text-center`}>
             Payment Details
           </h2>
 
-          <div className="space-y-6 mb-8">
-            <div className="bg-purple-50 rounded-lg p-6">
-              <div className="flex items-center gap-3 text-gray-900">
+          <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
+            <div className={`${themeClasses.secondary} rounded-lg p-4 sm:p-6`}>
+              <div className={`flex items-center gap-3 ${themeClasses.text}`}>
                 <span className="text-2xl">🛍️</span>
                 <p className="text-lg font-medium">{description}</p>
               </div>
             </div>
 
-            <div className="bg-blue-50 rounded-lg p-6">
+            <div className={`${themeClasses.secondary} rounded-lg p-4 sm:p-6`}>
               <div className="text-center">
-                <div className="text-blue-800 font-medium mb-2">
+                <div className={`text-${theme.primaryColor} font-medium mb-2`}>
                   Time Remaining
                 </div>
                 <div
@@ -475,7 +553,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
             <button
               type="submit"
-              className={baseButtonClasses}
+              className={`${baseButtonClasses} ${themeClasses.primary}`}
               disabled={loading || timeLeft <= 0}
             >
               {timeLeft <= 0 ? "Session Expired" : "Next →"}
@@ -488,8 +566,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
   // Modal overlay and content for step 2
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 animate-fade-in">
-      <div className="relative max-w-md w-full mx-auto bg-white rounded-xl shadow-2xl p-8 transform transition-all duration-500 animate-slide-up">
+    <div 
+      className={`fixed inset-0 z-50 flex justify-center p-4 bg-black bg-opacity-50 animate-fade-in ${getPositionClasses()}`}
+      onClick={handleOutsideClick}
+    >
+      <div 
+        ref={modalRef}
+        className={`relative ${getSizeClasses()} w-full mx-auto ${themeClasses.background} rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500 animate-slide-up overflow-auto max-h-[90vh]`}
+      >
         <button 
           onClick={handleClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -500,7 +584,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           </svg>
         </button>
         
-        <h2 className="text-3xl font-bold mb-8 text-gray-900 text-center">
+        <h2 className={`text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 ${themeClasses.text} text-center`}>
           Make Payment
         </h2>
 
@@ -526,9 +610,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             </div>
           </div>
 
-          <div className="bg-blue-50 rounded-lg p-6">
+          <div className={`${themeClasses.secondary} rounded-lg p-4 sm:p-6`}>
             <div className="text-center">
-              <div className="text-blue-800 font-medium mb-2">Time Remaining</div>
+              <div className={`text-${theme.primaryColor} font-medium mb-2`}>Time Remaining</div>
               <div
                 className={`text-3xl font-bold ${
                   timeLeft <= 300 ? "text-red-600 animate-pulse" : "text-blue-900"
@@ -539,9 +623,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             </div>
           </div>
 
-          <div className="bg-purple-50 rounded-lg p-6">
+          <div className={`${themeClasses.secondary} rounded-lg p-4 sm:p-6`}>
             <div className="text-center">
-              <div className="text-purple-800 font-medium mb-2">
+              <div className={`text-${theme.primaryColor} font-medium mb-2`}>
                 USDT Amount to Pay
               </div>
               <div className="text-3xl font-bold text-gray-900">
@@ -626,7 +710,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           ) : (
             <button
               type="submit"
-              className={baseButtonClasses}
+              className={`${baseButtonClasses} ${themeClasses.primary}`}
               disabled={loading || timeLeft <= 0}
             >
               {loading ? (

@@ -5,6 +5,10 @@ import { PaymentForm } from 'banana-crystal-payment';
 
 export default function PaymentPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalPosition, setModalPosition] = useState('center');
+  const [modalSize, setModalSize] = useState('default');
+  const [themeColor, setThemeColor] = useState('blue');
+  
   const [paymentConfig] = useState({
     storeId: 'your-store-id',
     amount: 5000,
@@ -13,6 +17,34 @@ export default function PaymentPage() {
     walletAddress: '0x1234567890abcdef1234567890abcdef12345678',
     redirectUrl: 'https://your-store.com/success',
   });
+
+  // Theme color presets
+  const themePresets = {
+    blue: {
+      primaryColor: 'blue-600',
+      secondaryColor: 'blue-50',
+      textColor: 'gray-900',
+      backgroundColor: 'white',
+    },
+    purple: {
+      primaryColor: 'purple-800',
+      secondaryColor: 'purple-50',
+      textColor: 'gray-900',
+      backgroundColor: 'white',
+    },
+    green: {
+      primaryColor: 'green-600',
+      secondaryColor: 'green-50',
+      textColor: 'gray-900',
+      backgroundColor: 'white',
+    },
+    dark: {
+      primaryColor: 'gray-800',
+      secondaryColor: 'gray-700',
+      textColor: 'gray-100',
+      backgroundColor: 'gray-900',
+    },
+  };
 
   const handleSuccess = (data) => {
     console.log('Payment successful:', data);
@@ -54,9 +86,62 @@ export default function PaymentPage() {
           <span>{(paymentConfig.amount * 1.0199).toFixed(2)} {paymentConfig.currency}</span>
         </div>
         
+        {/* Modal Customization Options */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <h3 className="text-lg font-medium mb-3">Modal Customization</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Position</label>
+              <select 
+                value={modalPosition}
+                onChange={(e) => setModalPosition(e.target.value)}
+                className="w-full p-2 border rounded"
+              >
+                <option value="top">Top</option>
+                <option value="center">Center</option>
+                <option value="bottom">Bottom</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Size</label>
+              <select 
+                value={modalSize}
+                onChange={(e) => setModalSize(e.target.value)}
+                className="w-full p-2 border rounded"
+              >
+                <option value="small">Small</option>
+                <option value="default">Default</option>
+                <option value="large">Large</option>
+                <option value="full">Full Width</option>
+              </select>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">Theme</label>
+            <div className="flex flex-wrap gap-2">
+              {Object.keys(themePresets).map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setThemeColor(color)}
+                  className={`px-3 py-1 rounded ${
+                    themeColor === color 
+                      ? `bg-${themePresets[color].primaryColor} text-white` 
+                      : 'bg-gray-200 text-gray-800'
+                  }`}
+                >
+                  {color.charAt(0).toUpperCase() + color.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        
         <button 
           onClick={handleOpenModal}
-          className="w-full bg-purple-800 text-white py-3 rounded-lg hover:bg-purple-900 transition-colors"
+          className={`w-full bg-${themePresets[themeColor].primaryColor} text-white py-3 rounded-lg hover:bg-${themePresets[themeColor].primaryColor.replace(/(-\d+)$/, (m) => `-${parseInt(m.substring(1)) + 100}`)} transition-colors`}
         >
           Proceed to Payment
         </button>
@@ -74,6 +159,9 @@ export default function PaymentPage() {
         onError={handleError}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
+        modalPosition={modalPosition}
+        modalSize={modalSize}
+        theme={themePresets[themeColor]}
       />
     </div>
   );

@@ -1,3 +1,10 @@
+export interface ThemeOptions {
+  primaryColor: string;
+  secondaryColor: string;
+  textColor: string;
+  backgroundColor: string;
+}
+
 export interface PaymentFormProps {
   storeId: string;
   amount: number;
@@ -9,6 +16,9 @@ export interface PaymentFormProps {
   onError?: (error: any) => void;
   isOpen?: boolean;
   onClose?: () => void;
+  modalPosition?: 'top' | 'center' | 'bottom';
+  modalSize?: 'small' | 'default' | 'large' | 'full';
+  theme?: ThemeOptions;
 }
 
 export interface PaymentDetails {

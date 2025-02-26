@@ -31,9 +31,9 @@ import { PaymentForm } from 'banana-crystal-payment';
 > import { PaymentForm } from 'banana-crystal-payment';
 > ```
 
-### Modal Usage (Recommended)
+### Modal Usage
 
-The PaymentForm component is designed to work as a modal that pops up when needed:
+The PaymentForm component is designed to work as a responsive modal that pops up when needed:
 
 ```jsx
 import React, { useState } from 'react';
@@ -86,6 +86,68 @@ The `PaymentForm` component accepts the following props:
 | `onError` | function | No | Callback function called on payment error |
 | `isOpen` | boolean | No | Controls whether the payment modal is open or closed |
 | `onClose` | function | No | Callback function called when the user closes the modal |
+| `modalPosition` | string | No | Position of the modal: 'top', 'center' (default), or 'bottom' |
+| `modalSize` | string | No | Size of the modal: 'small', 'default', 'large', or 'full' |
+| `theme` | object | No | Custom theme options (see below) |
+
+### Modal Customization
+
+The modal can be customized with the following options:
+
+#### Modal Position
+
+Control where the modal appears on the screen:
+
+```jsx
+<PaymentForm
+  // ... other props
+  modalPosition="top" // 'top', 'center' (default), or 'bottom'
+/>
+```
+
+#### Modal Size
+
+Adjust the width of the modal:
+
+```jsx
+<PaymentForm
+  // ... other props
+  modalSize="large" // 'small', 'default', 'large', or 'full'
+/>
+```
+
+#### Custom Theming
+
+Customize the colors used in the modal:
+
+```jsx
+<PaymentForm
+  // ... other props
+  theme={{
+    primaryColor: "blue-600", // Primary color for buttons and accents
+    secondaryColor: "gray-100", // Background color for info sections
+    textColor: "gray-800", // Main text color
+    backgroundColor: "white", // Modal background color
+  }}
+/>
+```
+
+### Responsive Design
+
+The modal is fully responsive and works well on all device sizes:
+
+- Automatically adjusts layout for mobile, tablet, and desktop screens
+- Scrollable content for smaller screens
+- Touch-friendly controls
+- Accessible design with keyboard navigation support
+
+### User Interaction
+
+The modal includes several user-friendly features:
+
+- Close by clicking outside the modal
+- Close using the escape key
+- Animated transitions for a smooth user experience
 
 ### Fee Calculation
 
@@ -93,7 +155,7 @@ The package automatically calculates a 1.99% fee on all payments.
 
 ### Styling
 
-The component uses Tailwind CSS classes for styling. You can customize the appearance by overriding these classes in your application.
+The component uses Tailwind CSS classes for styling. The new theming options make it easy to match your application's design system.
 
 ## Browser Compatibility
 
