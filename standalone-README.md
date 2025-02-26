@@ -4,13 +4,15 @@ This is a standalone React component for integrating USDT payments with BananaCr
 
 ## Features
 
-- Modal payment form with multi-step process
+- Responsive modal payment form with customizable positioning and sizing
+- Themeable design with customizable colors
 - Automatic fee calculation (1.99%)
 - Currency conversion to USD
-- Responsive design with animations
 - Built-in form validation
 - Session timeout handling
 - Success and error notifications
+- Accessibility features (keyboard navigation, screen reader support)
+- Mobile-friendly design
 
 ## How to Use
 
@@ -70,6 +72,58 @@ The `StandalonePaymentForm` component accepts the following props:
 | `onError` | function | No | Callback function called on payment error |
 | `isOpen` | boolean | No | Controls whether the payment modal is open or closed |
 | `onClose` | function | No | Callback function called when the user closes the modal |
+| `modalPosition` | string | No | Position of the modal: 'top', 'center' (default), or 'bottom' |
+| `modalSize` | string | No | Size of the modal: 'small', 'default', 'large', or 'full' |
+| `theme` | object | No | Custom theme options (see below) |
+
+## Customization
+
+### Modal Position
+
+Control where the modal appears on the screen:
+
+```jsx
+<StandalonePaymentForm
+  // ... other props
+  modalPosition="top" // 'top', 'center' (default), or 'bottom'
+/>
+```
+
+### Modal Size
+
+Adjust the width of the modal:
+
+```jsx
+<StandalonePaymentForm
+  // ... other props
+  modalSize="large" // 'small', 'default', 'large', or 'full'
+/>
+```
+
+### Custom Theming
+
+Customize the colors used in the modal:
+
+```jsx
+<StandalonePaymentForm
+  // ... other props
+  theme={{
+    primaryColor: "blue-600", // Primary color for buttons and accents
+    secondaryColor: "gray-100", // Background color for info sections
+    textColor: "gray-800", // Main text color
+    backgroundColor: "white", // Modal background color
+  }}
+/>
+```
+
+## User Interaction
+
+The modal includes several user-friendly features:
+
+- Close by clicking outside the modal
+- Close using the escape key
+- Animated transitions for a smooth user experience
+- Responsive design that works on all device sizes
 
 ## Styling
 
@@ -82,3 +136,5 @@ The component includes all necessary styles and animations. It uses utility clas
 3. The component includes a 30-minute countdown timer for the payment session.
 4. The component handles form validation and displays error messages.
 5. The component displays success and error notifications.
+6. The component is fully responsive and works on all device sizes.
+7. The component is accessible and supports keyboard navigation.

@@ -262,13 +262,83 @@ const StandalonePaymentForm = ({
   onError,
   isOpen = false,
   onClose,
+  modalPosition = "center",
+  modalSize = "default",
+  theme = {
+    primaryColor: "purple-800",
+    secondaryColor: "blue-50",
+    textColor: "gray-900",
+    backgroundColor: "white",
+  },
 }) => {
   // If the modal is not open, don't render anything
   if (!isOpen) return null;
 
+  // Reference for modal content
+  const modalRef = React.useRef(null);
+
   // Handle close button click
   const handleClose = () => {
     if (onClose) onClose();
+  };
+  
+  // Handle click outside the modal
+  const handleOutsideClick = (e) => {
+    if (modalRef.current && !modalRef.current.contains(e.target)) {
+      handleClose();
+    }
+  };
+  
+  // Handle escape key press
+  React.useEffect(() => {
+    const handleEscKey = (e) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    
+    document.addEventListener('keydown', handleEscKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscKey);
+    };
+  }, []);
+  
+  // Get modal position classes
+  const getPositionClasses = () => {
+    switch (modalPosition) {
+      case "top":
+        return "items-start pt-16";
+      case "bottom":
+        return "items-end pb-16";
+      case "center":
+      default:
+        return "items-center";
+    }
+  };
+  
+  // Get modal size classes
+  const getSizeClasses = () => {
+    switch (modalSize) {
+      case "small":
+        return "max-w-sm";
+      case "large":
+        return "max-w-lg";
+      case "full":
+        return "max-w-full mx-4 sm:mx-8";
+      case "default":
+      default:
+        return "max-w-md";
+    }
+  };
+  
+  // Get theme color classes
+  const getThemeColor = (color) => {
+    // For primary color with hover state
+    if (color === theme.primaryColor) {
+      return `bg-${color} hover:bg-${color.replace(/(-\d+)$/, (m) => `-${parseInt(m.substring(1)) + 100}`)} text-white`;
+    }
+    // For other colors
+    return `bg-${color}`;
   };
 
   const [step, setStep] = useState(1);
@@ -608,8 +678,14 @@ const StandalonePaymentForm = ({
     return (
       <>
         <style>{styles}</style>
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black bg-opacity-50 animate-fade-in overflow-y-auto">
-          <div className="relative max-w-md w-full mx-auto bg-white rounded-xl shadow-2xl p-8 transform transition-all duration-500 animate-slide-up my-8 max-h-[90vh] overflow-y-auto">
+        <div 
+          className={`fixed inset-0 z-50 flex justify-center p-4 bg-black bg-opacity-50 animate-fade-in overflow-y-auto ${getPositionClasses()}`}
+          onClick={handleOutsideClick}
+        >
+          <div 
+            ref={modalRef}
+            className={`relative ${getSizeClasses()} w-full mx-auto bg-${theme.backgroundColor} rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500 animate-slide-up my-8 max-h-[90vh] overflow-y-auto`}
+          >
             <button
               onClick={handleClose}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -631,21 +707,21 @@ const StandalonePaymentForm = ({
               </svg>
             </button>
 
-            <h2 className="text-3xl font-bold mb-8 text-gray-900 text-center">
+            <h2 className={`text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-${theme.textColor} text-center`}>
               Payment Details
             </h2>
 
             <div className="space-y-6 mb-8">
-              <div className="bg-purple-50 rounded-lg p-6">
-                <div className="flex items-center gap-3 text-gray-900">
+              <div className={`${getThemeColor(theme.secondaryColor)} rounded-lg p-4 sm:p-6`}>
+                <div className={`flex items-center gap-3 text-${theme.textColor}`}>
                   <span className="text-2xl">🛍️</span>
                   <p className="text-lg font-medium">{description}</p>
                 </div>
               </div>
 
-              <div className="bg-blue-50 rounded-lg p-6">
+              <div className={`${getThemeColor(theme.secondaryColor)} rounded-lg p-4 sm:p-6`}>
                 <div className="text-center">
-                  <div className="text-blue-800 font-medium mb-2">
+                  <div className={`text-${theme.primaryColor} font-medium mb-2`}>
                     Time Remaining
                   </div>
                   <div
@@ -821,7 +897,7 @@ const StandalonePaymentForm = ({
 
               <button
                 type="submit"
-                className={baseButtonClasses}
+                className={`${baseButtonClasses.replace('bg-purple-800', '')} ${getThemeColor(theme.primaryColor)}`}
                 disabled={loading || timeLeft <= 0}
               >
                 {timeLeft <= 0 ? "Session Expired" : "Next →"}
@@ -837,8 +913,14 @@ const StandalonePaymentForm = ({
   return (
     <>
       <style>{styles}</style>
-      <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black bg-opacity-50 animate-fade-in overflow-y-auto">
-        <div className="relative max-w-md w-full mx-auto bg-white rounded-xl shadow-2xl p-8 transform transition-all duration-500 animate-slide-up my-8 max-h-[90vh] overflow-y-auto">
+      <div 
+        className={`fixed inset-0 z-50 flex justify-center p-4 bg-black bg-opacity-50 animate-fade-in overflow-y-auto ${getPositionClasses()}`}
+        onClick={handleOutsideClick}
+      >
+        <div 
+          ref={modalRef}
+          className={`relative ${getSizeClasses()} w-full mx-auto bg-${theme.backgroundColor} rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500 animate-slide-up my-8 max-h-[90vh] overflow-y-auto`}
+        >
           <button
             onClick={handleClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -860,7 +942,7 @@ const StandalonePaymentForm = ({
             </svg>
           </button>
 
-          <h2 className="text-3xl font-bold mb-8 text-gray-900 text-center">
+          <h2 className={`text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-${theme.textColor} text-center`}>
             Make Payment
           </h2>
 
@@ -887,9 +969,9 @@ const StandalonePaymentForm = ({
               </div>
             </div>
 
-            <div className="bg-blue-50 rounded-lg p-6">
+            <div className={`${getThemeColor(theme.secondaryColor)} rounded-lg p-4 sm:p-6`}>
               <div className="text-center">
-                <div className="text-blue-800 font-medium mb-2">
+                <div className={`text-${theme.primaryColor} font-medium mb-2`}>
                   Time Remaining
                 </div>
                 <div
@@ -904,9 +986,9 @@ const StandalonePaymentForm = ({
               </div>
             </div>
 
-            <div className="bg-purple-50 rounded-lg p-6">
+            <div className={`${getThemeColor(theme.secondaryColor)} rounded-lg p-4 sm:p-6`}>
               <div className="text-center">
-                <div className="text-purple-800 font-medium mb-2">
+                <div className={`text-${theme.primaryColor} font-medium mb-2`}>
                   USDT Amount to Pay
                 </div>
                 <div className="text-3xl font-bold text-gray-900">
@@ -1027,7 +1109,7 @@ const StandalonePaymentForm = ({
             ) : (
               <button
                 type="submit"
-                className={baseButtonClasses}
+                className={`${baseButtonClasses.replace('bg-purple-800', '')} ${getThemeColor(theme.primaryColor)}`}
                 disabled={loading || timeLeft <= 0}
               >
                 {loading ? (
