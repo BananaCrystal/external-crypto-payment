@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { PaymentForm } from '../../components';
-import { useSearchParams } from 'next/navigation';
+import { PaymentForm } from "../../components";
+import { useSearchParams } from "next/navigation";
 
 interface SearchParams {
   store_id?: string;
@@ -15,26 +15,28 @@ interface SearchParams {
 
 function validateParams(params: SearchParams) {
   const errors = [];
-  
-  if (!params.store_id) errors.push('Store ID is required');
-  if (!params.amount || isNaN(parseFloat(params.amount))) errors.push('Valid amount is required');
-  if (!params.description) errors.push('Description is required');
-  if (!params.usd_amount || isNaN(parseFloat(params.usd_amount))) errors.push('Valid USD amount is required');
-  if (!params.wallet_address) errors.push('Wallet address is required');
-  
+
+  if (!params.store_id) errors.push("Store ID is required");
+  if (!params.amount || isNaN(parseFloat(params.amount)))
+    errors.push("Valid amount is required");
+  if (!params.description) errors.push("Description is required");
+  if (!params.usd_amount || isNaN(parseFloat(params.usd_amount)))
+    errors.push("Valid USD amount is required");
+  if (!params.wallet_address) errors.push("Wallet address is required");
+
   return errors;
 }
 
 export default function PaymentPage() {
   const searchParams = useSearchParams();
   const params = {
-    store_id: searchParams.get('store_id') || '',
-    amount: searchParams.get('amount') || '',
-    currency: searchParams.get('currency') || '',
-    description: searchParams.get('description') || '',
-    usd_amount: searchParams.get('usd_amount') || '',
-    redirect_url: searchParams.get('redirect_url') || '',
-    wallet_address: searchParams.get('wallet_address') || '',
+    store_id: searchParams.get("store_id") || "",
+    amount: searchParams.get("amount") || "",
+    currency: searchParams.get("currency") || "",
+    description: searchParams.get("description") || "",
+    usd_amount: searchParams.get("usd_amount") || "",
+    redirect_url: searchParams.get("redirect_url") || "",
+    wallet_address: searchParams.get("wallet_address") || "",
   };
   const errors = validateParams(params);
 
@@ -43,7 +45,8 @@ export default function PaymentPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
           <h2 className="text-2xl font-bold text-red-600 mb-4">
-            <span className="inline-block animate-bounce">⚠️</span> Invalid Payment URL
+            <span className="inline-block animate-bounce">⚠️</span> Invalid
+            Payment URL
           </h2>
           <div className="bg-red-50 rounded-lg p-4 mb-6">
             <ul className="list-disc list-inside space-y-1 text-red-700">
@@ -56,13 +59,32 @@ export default function PaymentPage() {
             Please ensure your payment URL includes all required parameters:
           </p>
           <ul className="space-y-2 text-gray-600">
-            <li><code className="text-purple-700">store_id</code>: Your store identifier</li>
-            <li><code className="text-purple-700">amount</code>: Payment amount</li>
-            <li><code className="text-purple-700">currency</code>: Payment currency (default: NGN)</li>
-            <li><code className="text-purple-700">description</code>: Payment description</li>
-            <li><code className="text-purple-700">usd_amount</code>: Amount in USD</li>
-            <li><code className="text-purple-700">wallet_address</code>: USDT wallet address (Polygon)</li>
-            <li><code className="text-purple-700">redirect_url</code>: (Optional) URL to redirect after payment</li>
+            <li>
+              <code className="text-purple-700">store_id</code>: Your store
+              identifier
+            </li>
+            <li>
+              <code className="text-purple-700">amount</code>: Payment amount
+            </li>
+            <li>
+              <code className="text-purple-700">currency</code>: Payment
+              currency (default: NGN)
+            </li>
+            <li>
+              <code className="text-purple-700">description</code>: Payment
+              description
+            </li>
+            <li>
+              <code className="text-purple-700">usd_amount</code>: Amount in USD
+            </li>
+            <li>
+              <code className="text-purple-700">wallet_address</code>: USDT
+              wallet address (Polygon)
+            </li>
+            <li>
+              <code className="text-purple-700">redirect_url</code>: (Optional)
+              URL to redirect after payment
+            </li>
           </ul>
           <div className="mt-6 bg-purple-50 rounded-lg p-4">
             <p className="font-medium text-purple-800 mb-2">Example URL:</p>
@@ -81,7 +103,7 @@ export default function PaymentPage() {
         <PaymentForm
           storeId={params.store_id!}
           amount={parseFloat(params.amount!)}
-          currency={params.currency || 'NGN'}
+          currency={params.currency || "USD"}
           description={params.description!}
           usd_amount={parseFloat(params.usd_amount!)}
           wallet_address={params.wallet_address!}
