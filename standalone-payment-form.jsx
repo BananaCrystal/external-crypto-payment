@@ -151,7 +151,11 @@ const COUNTRY_CODES = [
   { country: "Rwanda", code: "+250", isoCode: "RW" },
   { country: "Saint Kitts and Nevis", code: "+1-869", isoCode: "KN" },
   { country: "Saint Lucia", code: "+1-758", isoCode: "LC" },
-  { country: "Saint Vincent and the Grenadines", code: "+1-784", isoCode: "VC" },
+  {
+    country: "Saint Vincent and the Grenadines",
+    code: "+1-784",
+    isoCode: "VC",
+  },
   { country: "Samoa", code: "+685", isoCode: "WS" },
   { country: "San Marino", code: "+378", isoCode: "SM" },
   { country: "Sao Tome and Principe", code: "+239", isoCode: "ST" },
@@ -262,83 +266,13 @@ const StandalonePaymentForm = ({
   onError,
   isOpen = false,
   onClose,
-  modalPosition = "center",
-  modalSize = "default",
-  theme = {
-    primaryColor: "purple-800",
-    secondaryColor: "blue-50",
-    textColor: "gray-900",
-    backgroundColor: "white",
-  },
 }) => {
   // If the modal is not open, don't render anything
   if (!isOpen) return null;
 
-  // Reference for modal content
-  const modalRef = React.useRef(null);
-
   // Handle close button click
   const handleClose = () => {
     if (onClose) onClose();
-  };
-  
-  // Handle click outside the modal
-  const handleOutsideClick = (e) => {
-    if (modalRef.current && !modalRef.current.contains(e.target)) {
-      handleClose();
-    }
-  };
-  
-  // Handle escape key press
-  React.useEffect(() => {
-    const handleEscKey = (e) => {
-      if (e.key === 'Escape') {
-        handleClose();
-      }
-    };
-    
-    document.addEventListener('keydown', handleEscKey);
-    return () => {
-      document.removeEventListener('keydown', handleEscKey);
-    };
-  }, []);
-  
-  // Get modal position classes
-  const getPositionClasses = () => {
-    switch (modalPosition) {
-      case "top":
-        return "items-start pt-16";
-      case "bottom":
-        return "items-end pb-16";
-      case "center":
-      default:
-        return "items-center";
-    }
-  };
-  
-  // Get modal size classes
-  const getSizeClasses = () => {
-    switch (modalSize) {
-      case "small":
-        return "max-w-sm";
-      case "large":
-        return "max-w-lg";
-      case "full":
-        return "max-w-full mx-4 sm:mx-8";
-      case "default":
-      default:
-        return "max-w-md";
-    }
-  };
-  
-  // Get theme color classes
-  const getThemeColor = (color) => {
-    // For primary color with hover state
-    if (color === theme.primaryColor) {
-      return `bg-${color} hover:bg-${color.replace(/(-\d+)$/, (m) => `-${parseInt(m.substring(1)) + 100}`)} text-white`;
-    }
-    // For other colors
-    return `bg-${color}`;
   };
 
   const [step, setStep] = useState(1);
@@ -445,7 +379,7 @@ const StandalonePaymentForm = ({
       setLoading(true);
       setError(null);
 
-      // Sign up user
+      // Sign up user (continue even if it fails)
       try {
         await fetch("https://app.bananacrystal.com/api/users/sign_up", {
           method: "POST",
@@ -461,7 +395,6 @@ const StandalonePaymentForm = ({
           }),
         });
       } catch (error) {
-        // Continue even if signup fails
         console.error("Signup error:", error);
       }
 
@@ -474,8 +407,9 @@ const StandalonePaymentForm = ({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            amount: formData.amount,
+            gross_amount: formData.amount,
             currency: formData.currency,
+            fees: formData.fees,
             description: description,
             usd_amount: formData.usdAmount,
             first_name: formData.firstName,
@@ -490,47 +424,55 @@ const StandalonePaymentForm = ({
         }
       );
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        // Log the full response for debugging
-        console.log("Full API response:", result);
-
-        // Get detailed error message from the API response
-        const errorMessage =
-          result.message || result.error || JSON.stringify(result);
-        throw new Error(errorMessage);
+      let result;
+      try {
+        result = await response.json();
+      } catch (error) {
+        console.warn("Failed to parse JSON response", error);
+        result = null; // If parsing fails, assume empty response
       }
 
-      // Show success message
-      const successMessage = document.createElement("div");
-      successMessage.className =
-        "fixed top-4 right-4 bg-green-50 text-green-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
-      successMessage.innerHTML = `
-        <div class="flex items-center gap-2">
-          <span>✅</span>
-          <p>Payment verified successfully!</p>
-        </div>
-      `;
-      document.body.appendChild(successMessage);
+      // Check for success: either response.status === 201 or response is empty (no status)
+      if (!response.status || response.status === 201) {
+        console.log("Payment successful:", result || "No response body");
 
-      // Call onSuccess callback if provided
-      if (onSuccess) {
-        onSuccess(result);
-      }
+        // Show success message
+        const successMessage = document.createElement("div");
+        successMessage.className =
+          "fixed top-4 right-4 bg-green-50 text-green-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
+        successMessage.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span>✅</span>
+            <p>Payment verified successfully!</p>
+          </div>
+        `;
+        document.body.appendChild(successMessage);
 
-      // Remove success message after 3 seconds
-      setTimeout(() => {
-        successMessage.classList.add("animate-slide-out");
-        setTimeout(() => successMessage.remove(), 300);
-
-        // Redirect after showing success message
-        if (redirectUrl) {
-          window.location.href = redirectUrl;
+        // Call onSuccess callback if provided
+        if (onSuccess) {
+          onSuccess(result);
         }
-      }, 3000);
+
+        // Remove success message after 3 seconds
+        setTimeout(() => {
+          successMessage.classList.add("animate-slide-out");
+          setTimeout(() => successMessage.remove(), 300);
+
+          // Redirect after showing success message
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+          }
+        }, 3000);
+
+        return; // Stop further execution
+      }
+
+      // Handle failure cases
+      console.log("Full API response:", result);
+      const errorMessage =
+        result?.message || result?.error || "Unknown error occurred";
+      throw new Error(errorMessage);
     } catch (error) {
-      // More detailed error handling
       console.error("Payment error (full):", error);
 
       // Show detailed error message
@@ -678,14 +620,8 @@ const StandalonePaymentForm = ({
     return (
       <>
         <style>{styles}</style>
-        <div 
-          className={`fixed inset-0 z-50 flex justify-center p-4 bg-black bg-opacity-50 animate-fade-in overflow-y-auto ${getPositionClasses()}`}
-          onClick={handleOutsideClick}
-        >
-          <div 
-            ref={modalRef}
-            className={`relative ${getSizeClasses()} w-full mx-auto bg-${theme.backgroundColor} rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500 animate-slide-up my-8 max-h-[90vh] overflow-y-auto`}
-          >
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black bg-opacity-50 animate-fade-in overflow-y-auto">
+          <div className="relative max-w-md w-full mx-auto bg-white rounded-xl shadow-2xl p-8 transform transition-all duration-500 animate-slide-up my-8 max-h-[90vh] overflow-y-auto">
             <button
               onClick={handleClose}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -707,21 +643,21 @@ const StandalonePaymentForm = ({
               </svg>
             </button>
 
-            <h2 className={`text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-${theme.textColor} text-center`}>
+            <h2 className="text-3xl font-bold mb-8 text-gray-900 text-center">
               Payment Details
             </h2>
 
             <div className="space-y-6 mb-8">
-              <div className={`${getThemeColor(theme.secondaryColor)} rounded-lg p-4 sm:p-6`}>
-                <div className={`flex items-center gap-3 text-${theme.textColor}`}>
+              <div className="bg-purple-50 rounded-lg p-6">
+                <div className="flex items-center gap-3 text-gray-900">
                   <span className="text-2xl">🛍️</span>
                   <p className="text-lg font-medium">{description}</p>
                 </div>
               </div>
 
-              <div className={`${getThemeColor(theme.secondaryColor)} rounded-lg p-4 sm:p-6`}>
+              <div className="bg-blue-50 rounded-lg p-6">
                 <div className="text-center">
-                  <div className={`text-${theme.primaryColor} font-medium mb-2`}>
+                  <div className="text-blue-800 font-medium mb-2">
                     Time Remaining
                   </div>
                   <div
@@ -897,7 +833,7 @@ const StandalonePaymentForm = ({
 
               <button
                 type="submit"
-                className={`${baseButtonClasses.replace('bg-purple-800', '')} ${getThemeColor(theme.primaryColor)}`}
+                className={baseButtonClasses}
                 disabled={loading || timeLeft <= 0}
               >
                 {timeLeft <= 0 ? "Session Expired" : "Next →"}
@@ -913,14 +849,8 @@ const StandalonePaymentForm = ({
   return (
     <>
       <style>{styles}</style>
-      <div 
-        className={`fixed inset-0 z-50 flex justify-center p-4 bg-black bg-opacity-50 animate-fade-in overflow-y-auto ${getPositionClasses()}`}
-        onClick={handleOutsideClick}
-      >
-        <div 
-          ref={modalRef}
-          className={`relative ${getSizeClasses()} w-full mx-auto bg-${theme.backgroundColor} rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500 animate-slide-up my-8 max-h-[90vh] overflow-y-auto`}
-        >
+      <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black bg-opacity-50 animate-fade-in overflow-y-auto">
+        <div className="relative max-w-md w-full mx-auto bg-white rounded-xl shadow-2xl p-8 transform transition-all duration-500 animate-slide-up my-8 max-h-[90vh] overflow-y-auto">
           <button
             onClick={handleClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -942,7 +872,7 @@ const StandalonePaymentForm = ({
             </svg>
           </button>
 
-          <h2 className={`text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-${theme.textColor} text-center`}>
+          <h2 className="text-3xl font-bold mb-8 text-gray-900 text-center">
             Make Payment
           </h2>
 
@@ -957,7 +887,7 @@ const StandalonePaymentForm = ({
               <div className="flex justify-between mb-3">
                 <span className="text-gray-600">Fee (1.99%):</span>
                 <span className="text-orange-500">
-                  {formData.fees.toFixed(2)} {formData.currency}
+                  {formData.fees.toFixed(3)} {formData.currency}
                 </span>
               </div>
               <div className="flex justify-between font-bold">
@@ -969,9 +899,9 @@ const StandalonePaymentForm = ({
               </div>
             </div>
 
-            <div className={`${getThemeColor(theme.secondaryColor)} rounded-lg p-4 sm:p-6`}>
+            <div className="bg-blue-50 rounded-lg p-6">
               <div className="text-center">
-                <div className={`text-${theme.primaryColor} font-medium mb-2`}>
+                <div className="text-blue-800 font-medium mb-2">
                   Time Remaining
                 </div>
                 <div
@@ -986,13 +916,14 @@ const StandalonePaymentForm = ({
               </div>
             </div>
 
-            <div className={`${getThemeColor(theme.secondaryColor)} rounded-lg p-4 sm:p-6`}>
+            <div className="bg-purple-50 rounded-lg p-6">
               <div className="text-center">
-                <div className={`text-${theme.primaryColor} font-medium mb-2`}>
+                <div className="text-purple-800 font-medium mb-2">
                   USDT Amount to Pay
                 </div>
                 <div className="text-3xl font-bold text-gray-900">
-                  ${usdAmount ? formatCurrency(usdAmount) : "..."} USDT
+                  ${usdAmount ? formatCurrency(amount + formData.fees) : "..."}{" "}
+                  USDT
                 </div>
               </div>
             </div>
@@ -1017,7 +948,8 @@ const StandalonePaymentForm = ({
                 {formData.walletAddress}
               </p>
               <p className="text-sm text-gray-500 mt-2">
-                Send exactly ${usdAmount ? formatCurrency(usdAmount) : "..."}{" "}
+                Send exactly $
+                {usdAmount ? formatCurrency(usdAmount + formData.fees) : "..."}{" "}
                 USDT to the store's wallet address on the Polygon network
               </p>
             </div>
@@ -1109,7 +1041,7 @@ const StandalonePaymentForm = ({
             ) : (
               <button
                 type="submit"
-                className={`${baseButtonClasses.replace('bg-purple-800', '')} ${getThemeColor(theme.primaryColor)}`}
+                className={baseButtonClasses}
                 disabled={loading || timeLeft <= 0}
               >
                 {loading ? (
