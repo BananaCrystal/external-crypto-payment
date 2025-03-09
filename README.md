@@ -2,8 +2,55 @@
 
 This repository provides solutions for integrating USDT payments with BananaCrystal in React applications. It offers two implementation options:
 
-1. **NPM Package**: A fully-featured React component library
-2. **Standalone Implementation**: A self-contained component that can be directly copied into your project
+
+1. **Standalone Implementation**: A self-contained component that can be directly copied into your project (recommended)
+2. **NPM Package**: A fully-featured React component library. 
+
+## Standalone Implementation
+
+If you prefer not to add a dependency to your project, you can use the standalone implementation.
+
+### How to Use
+
+1. Copy these two files into your project:
+   - [`standalone-payment-form.jsx`](./standalone-payment-form.jsx) - The main component
+   - [`standalone-example.jsx`](./standalone-example.jsx) - An example of how to use the component
+
+Use the component in your app:
+
+```jsx
+"use client"; // Add this if using Next.js App Router
+
+import React, { useState } from 'react';
+import StandalonePaymentForm from './path/to/standalone-payment-form';
+
+export default function YourComponent() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  return (
+    <div>
+      <button onClick={() => setIsModalOpen(true)}>
+        Open Payment Form
+      </button>
+      
+      <StandalonePaymentForm
+        storeId="your-store-id"
+        amount={5000}
+        currency="NGN"
+        description="Product Purchase"
+        walletAddress="0x1234567890abcdef1234567890abcdef12345678"
+        redirectUrl="https://your-store.com/success"
+        onSuccess={(data) => console.log('Payment successful:', data)}
+        onError={(error) => console.error('Payment failed:', error)}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
+    </div>
+  );
+}
+```
+
+For more details on the standalone implementation, see the [standalone documentation](./standalone-README.md).
 
 ## NPM Package: banana-crystal-payment
 
@@ -93,52 +140,6 @@ The modal can be customized with various options:
 ```
 
 For more details, see the [full documentation](./banana-crystal-payment/README.md).
-
-## Standalone Implementation
-
-If you prefer not to add a dependency to your project, you can use the standalone implementation.
-
-### How to Use
-
-1. Copy these two files into your project:
-   - [`standalone-payment-form.jsx`](./standalone-payment-form.jsx) - The main component
-   - [`standalone-example.jsx`](./standalone-example.jsx) - An example of how to use the component
-
-2. Use the component in your app:
-
-```jsx
-"use client"; // Add this if using Next.js App Router
-
-import React, { useState } from 'react';
-import StandalonePaymentForm from './path/to/standalone-payment-form';
-
-export default function YourComponent() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  return (
-    <div>
-      <button onClick={() => setIsModalOpen(true)}>
-        Open Payment Form
-      </button>
-      
-      <StandalonePaymentForm
-        storeId="your-store-id"
-        amount={5000}
-        currency="NGN"
-        description="Product Purchase"
-        walletAddress="0x1234567890abcdef1234567890abcdef12345678"
-        redirectUrl="https://your-store.com/success"
-        onSuccess={(data) => console.log('Payment successful:', data)}
-        onError={(error) => console.error('Payment failed:', error)}
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
-    </div>
-  );
-}
-```
-
-For more details on the standalone implementation, see the [standalone documentation](./standalone-README.md).
 
 ## Key Differences Between Implementations
 
