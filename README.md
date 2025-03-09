@@ -139,6 +139,41 @@ The modal can be customized with various options:
 />
 ```
 
+## Known Issues
+
+### Webpack Compatibility with `aesmodule`
+
+Some users have reported issues when using this package with Webpack due to `aesmodule`. If you encounter errors related to `aesmodule` during compilation, consider the following solutions:
+
+#### 1. Ensure Node.js Compatibility
+Make sure your Node.js version is up to date.
+
+#### 2. Try Installing `aesmodule` Manually
+If `aesmodule` is missing or not compiling properly, try running:
+```sh
+npm install aesmodule --save
+```
+
+#### 3. Check Webpack Configuration
+You may need to update your Webpack config to properly handle native modules. Adding the following to your Webpack config might help:
+```js
+resolve: {
+  fallback: {
+    crypto: require.resolve('crypto-browserify')
+  }
+}
+```
+
+#### 4. Use a Different Webpack Target
+If the issue persists, try setting Webpack's target to `node`:
+```js
+target: "node"
+```
+
+#### 5. Contact Support
+If none of the above solutions work, please make use of option 1
+
+
 For more details, see the [full documentation](./banana-crystal-payment/README.md).
 
 ## Key Differences Between Implementations
