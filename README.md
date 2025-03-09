@@ -170,7 +170,7 @@ If the issue persists, try setting Webpack's target to `node`:
 target: "node"
 ```
 
-#### 5. Contact Support
+#### Note
 If none of the above solutions work, please make use of option 1
 
 
