@@ -18,7 +18,7 @@ const pkg = JSON.parse(
 );
 
 export default {
-  input: "src/index.ts",
+  input: "src/PaymentForm.tsx",
   output: [
     {
       dir: "dist", // Use dir instead of file to support multiple entry points

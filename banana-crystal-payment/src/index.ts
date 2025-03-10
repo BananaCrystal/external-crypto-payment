@@ -5,7 +5,7 @@ import "./styles.css";
 import PaymentForm from "./PaymentForm";
 // Export components
 export { default as PaymentForm } from "./PaymentForm";
-console.log("Exporting PaymentForm:", PaymentForm);
+
 
 // Export types
 export * from "./types";
