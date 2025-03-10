@@ -26,33 +26,33 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
 }) => {
   // If the modal is not open, don't render anything
   if (!isOpen) return null;
-  
+
   // Reference to the modal content
   const modalRef = useRef<HTMLDivElement>(null);
-  
+
   // Handle close button click
   const handleClose = () => {
     if (onClose) onClose();
   };
-  
+
   // Handle click outside the modal
   const handleOutsideClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
       handleClose();
     }
   };
-  
+
   // Handle escape key press
   useEffect(() => {
     const handleEscKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         handleClose();
       }
     };
-    
-    document.addEventListener('keydown', handleEscKey);
+
+    document.addEventListener("keydown", handleEscKey);
     return () => {
-      document.removeEventListener('keydown', handleEscKey);
+      document.removeEventListener("keydown", handleEscKey);
     };
   }, []);
 
@@ -84,10 +84,10 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
       try {
         setLoading(true);
         const usdValue = await convertToUsd(amount, currency);
-        
+
         if (usdValue !== null) {
           setUsdAmount(usdValue);
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
             usdAmount: usdValue,
           }));
@@ -160,7 +160,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
       setLoading(true);
       setError(null);
 
-      // Sign up user
+      // Sign up user (continue even if it fails)
       try {
         await fetch("https://app.bananacrystal.com/api/users/sign_up", {
           method: "POST",
@@ -176,7 +176,6 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
           }),
         });
       } catch (error) {
-        // Continue even if signup fails
         console.error("Signup error:", error);
       }
 
@@ -206,47 +205,55 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
         }
       );
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        // Log the full response for debugging
-        console.log("Full API response:", result);
-
-        // Get detailed error message from the API response
-        const errorMessage =
-          result.message || result.error || JSON.stringify(result);
-        throw new Error(errorMessage);
+      let result;
+      try {
+        result = await response.json();
+      } catch (error) {
+        console.warn("Failed to parse JSON response", error);
+        result = null; // If parsing fails, assume empty response
       }
 
-      // Show success message
-      const successMessage = document.createElement("div");
-      successMessage.className =
-        "fixed top-4 right-4 bg-green-50 text-green-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
-      successMessage.innerHTML = `
-        <div class="flex items-center gap-2">
-          <span>✅</span>
-          <p>Payment verified successfully!</p>
-        </div>
-      `;
-      document.body.appendChild(successMessage);
+      // Check for success: either response.status === 201 or response is empty (no status)
+      if (!response.status || response.status === 201) {
+        console.log("Payment successful:", result || "No response body");
 
-      // Call onSuccess callback if provided
-      if (onSuccess) {
-        onSuccess(result);
-      }
+        // Show success message
+        const successMessage = document.createElement("div");
+        successMessage.className =
+          "fixed top-4 right-4 bg-green-50 text-green-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
+        successMessage.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span>✅</span>
+            <p>Payment verified successfully!</p>
+          </div>
+        `;
+        document.body.appendChild(successMessage);
 
-      // Remove success message after 3 seconds
-      setTimeout(() => {
-        successMessage.classList.add("animate-slide-out");
-        setTimeout(() => successMessage.remove(), 300);
-
-        // Redirect after showing success message
-        if (redirectUrl) {
-          window.location.href = redirectUrl;
+        // Call onSuccess callback if provided
+        if (onSuccess) {
+          onSuccess(result);
         }
-      }, 3000);
+
+        // Remove success message after 3 seconds
+        setTimeout(() => {
+          successMessage.classList.add("animate-slide-out");
+          setTimeout(() => successMessage.remove(), 300);
+
+          // Redirect after showing success message
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+          }
+        }, 3000);
+
+        return; // Stop further execution
+      }
+
+      // Handle failure cases
+      console.log("Full API response:", result);
+      const errorMessage =
+        result?.message || result?.error || "Unknown error occurred";
+      throw new Error(errorMessage);
     } catch (error) {
-      // More detailed error handling
       console.error("Payment error (full):", error);
 
       // Show detailed error message
@@ -318,7 +325,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
         return "items-center";
     }
   };
-  
+
   // Get modal size classes
   const getSizeClasses = () => {
     switch (modalSize) {
@@ -333,41 +340,59 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
         return "max-w-md";
     }
   };
-  
+
   // Get theme color classes
   const getThemeClasses = () => {
     return {
-      primary: `bg-${theme.primaryColor} hover:bg-${theme.primaryColor.replace(/(-\d+)$/, (m: string) => `-${parseInt(m.substring(1)) + 100}`)} text-white`,
+      primary: `bg-${theme.primaryColor} hover:bg-${theme.primaryColor.replace(
+        /(-\d+)$/,
+        (m: string) => `-${parseInt(m.substring(1)) + 100}`
+      )} text-white`,
       secondary: `bg-${theme.secondaryColor}`,
       text: `text-${theme.textColor}`,
       background: `bg-${theme.backgroundColor}`,
     };
   };
-  
+
   const themeClasses = getThemeClasses();
-  
+
   // Modal overlay and content for step 1
   if (step === 1) {
     return (
-      <div 
+      <div
         className={`fixed inset-0 z-50 flex justify-center p-4 bg-black bg-opacity-50 animate-fade-in ${getPositionClasses()}`}
         onClick={handleOutsideClick}
       >
-        <div 
+        <div
           ref={modalRef}
-          className={`relative ${getSizeClasses()} w-full mx-auto ${themeClasses.background} rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500 animate-slide-up overflow-auto max-h-[90vh]`}
+          className={`relative ${getSizeClasses()} w-full mx-auto ${
+            themeClasses.background
+          } rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500 animate-slide-up overflow-auto max-h-[90vh]`}
         >
-          <button 
+          <button
             onClick={handleClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
             aria-label="Close"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
-          
-          <h2 className={`text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 ${themeClasses.text} text-center`}>
+
+          <h2
+            className={`text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 ${themeClasses.text} text-center`}
+          >
             Payment Details
           </h2>
 
@@ -567,25 +592,40 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
 
   // Modal overlay and content for step 2
   return (
-    <div 
+    <div
       className={`fixed inset-0 z-50 flex justify-center p-4 bg-black bg-opacity-50 animate-fade-in ${getPositionClasses()}`}
       onClick={handleOutsideClick}
     >
-      <div 
+      <div
         ref={modalRef}
-        className={`relative ${getSizeClasses()} w-full mx-auto ${themeClasses.background} rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500 animate-slide-up overflow-auto max-h-[90vh]`}
+        className={`relative ${getSizeClasses()} w-full mx-auto ${
+          themeClasses.background
+        } rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500 animate-slide-up overflow-auto max-h-[90vh]`}
       >
-        <button 
+        <button
           onClick={handleClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
           aria-label="Close"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
-        
-        <h2 className={`text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 ${themeClasses.text} text-center`}>
+
+        <h2
+          className={`text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 ${themeClasses.text} text-center`}
+        >
           Make Payment
         </h2>
 
@@ -606,17 +646,22 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
             <div className="flex justify-between font-bold">
               <span className="text-gray-900">Total Amount:</span>
               <span className="text-gray-900">
-                {formatCurrency(formData.amount + formData.fees)} {formData.currency}
+                {formatCurrency(formData.amount + formData.fees)}{" "}
+                {formData.currency}
               </span>
             </div>
           </div>
 
           <div className={`${themeClasses.secondary} rounded-lg p-4 sm:p-6`}>
             <div className="text-center">
-              <div className={`text-${theme.primaryColor} font-medium mb-2`}>Time Remaining</div>
+              <div className={`text-${theme.primaryColor} font-medium mb-2`}>
+                Time Remaining
+              </div>
               <div
                 className={`text-3xl font-bold ${
-                  timeLeft <= 300 ? "text-red-600 animate-pulse" : "text-blue-900"
+                  timeLeft <= 300
+                    ? "text-red-600 animate-pulse"
+                    : "text-blue-900"
                 }`}
               >
                 {formatTime(timeLeft)}
@@ -655,8 +700,8 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
               {formData.walletAddress}
             </p>
             <p className="text-sm text-gray-500 mt-2">
-              Send exactly ${usdAmount ? formatCurrency(usdAmount) : "..."} USDT to the store's
-              wallet address on the Polygon network
+              Send exactly ${usdAmount ? formatCurrency(usdAmount) : "..."} USDT
+              to the store's wallet address on the Polygon network
             </p>
           </div>
 
