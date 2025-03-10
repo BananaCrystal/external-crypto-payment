@@ -1,17 +1,19 @@
 // Import styles
-import './styles.css';
+import "./styles.css";
 
 // Import components
-import PaymentForm from './PaymentForm';
-
+import PaymentForm from "./PaymentForm";
 // Export components
-export { PaymentForm };
+export { default as PaymentForm } from "./PaymentForm";
+console.log("Exporting PaymentForm:", PaymentForm);
 
 // Export types
-export * from './types';
+export * from "./types";
+
+
 
 // Export constants
-export { COUNTRY_CODES, CURRENCIES, FEE_PERCENTAGE } from './constants';
+export { COUNTRY_CODES, CURRENCIES, FEE_PERCENTAGE } from "./constants";
 
 // Export utility functions
 export {
@@ -19,5 +21,5 @@ export {
   fetchExchangeRate,
   convertToUsd,
   calculateFee,
-  formatTime
-} from './helpers';
+  formatTime,
+} from "./helpers";

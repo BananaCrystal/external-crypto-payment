@@ -4,7 +4,7 @@ import { PaymentFormProps, PaymentDetails } from "./types";
 import { COUNTRY_CODES, FEE_PERCENTAGE } from "./constants";
 import { formatCurrency, formatTime, convertToUsd } from "./helpers";
 
-const PaymentForm: React.FC<PaymentFormProps> = ({
+export const PaymentForm: React.FC<PaymentFormProps> = ({
   storeId,
   amount,
   currency,
@@ -189,8 +189,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            amount: formData.amount,
+            gross_amount: formData.amount,
             currency: formData.currency,
+            fees: formData.fees,
             description: description,
             usd_amount: formData.usdAmount,
             first_name: formData.firstName,

@@ -1,37 +1,42 @@
 {
   "name": "banana-crystal-payment",
-  "version": "1.1.5",
+  "version": "1.1.9",
   "description": "A React component for integrating USDT payments with BananaCrystal",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "browser": "dist/index.browser.js",
   "types": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
+  "sideEffects": false,
   "scripts": {
     "build": "rollup -c",
     "test": "jest",
     "prepublishOnly": "npm run build"
   },
-  "keywords": [
-    "payment",
-    "crypto",
-    "usdt",
-    "react",
-    "banana-crystal"
-  ],
-  "author": "",
-  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./PaymentForm": {
+      "import": "./dist/PaymentForm.js",
+      "require": "./dist/PaymentForm.js",
+      "types": "./dist/PaymentForm.d.ts"
+    }
+  },
   "peerDependencies": {
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0"
   },
   "devDependencies": {
+    "@babel/preset-react": "^7.18.6",
+    "@rollup/plugin-babel": "^6.0.3",
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-json": "^6.0.0",
     "@rollup/plugin-node-resolve": "^15.0.0",
+    "@rollup/plugin-replace": "^5.0.0",
     "@rollup/plugin-typescript": "^11.0.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
@@ -40,7 +45,5 @@
     "rollup-plugin-postcss": "^4.0.2",
     "typescript": "^5.0.0",
     "tslib": "^2.5.0"
-  },
-  "dependencies": {
   }
 }
