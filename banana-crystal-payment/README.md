@@ -19,6 +19,7 @@ yarn add banana-crystal-payment react react-dom
 Import the component using named imports:
 
 ```jsx
+
 // Named import
 import { PaymentForm } from "banana-crystal-payment";
 ```
