@@ -27,7 +27,7 @@ jobs:
 
       - name: Deploy to S3
         run: |
-          aws s3 sync ./out s3://$PRODUCTION_S3_BUCKET_NAME --delete
+          aws s3 sync ./out s3://$S3_BUCKET_NAME --delete
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.PRODUCTION_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.PRODUCTION_AWS_SECRET_ACCESS_KEY }}
@@ -37,7 +37,7 @@ jobs:
       - name: Invalidate CloudFront Cache
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id $PRODUCTION_CLOUDFRONT_DISTRIBUTION_ID \
+            --distribution-id $CLOUDFRONT_DISTRIBUTION_IDD \
             --paths "/*"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.PRODUCTION_AWS_ACCESS_KEY_ID }}

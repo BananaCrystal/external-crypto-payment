@@ -27,12 +27,12 @@ jobs:
 
       - name: Deploy to S3
         run: |
-          aws s3 sync ./out s3://external-payment-widget-stg --delete
+          aws s3 sync ./out s3://$S3_BUCKET_NAME --delete
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.STAGING_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.STAGING_AWS_REGION }}
-#          S3_BUCKET_NAME: ${{ secrets.STAGING_S3_BUCKET_NAME }}
+          S3_BUCKET_NAME: ${{ secrets.STAGING_S3_BUCKET_NAME }}
 
       - name: Invalidate CloudFront Cache
         run: |
