@@ -317,7 +317,16 @@ function PaymentPage() {
 
 export default PaymentPage;
 ```
+🔁 CI/CD Deployment Workflow
+✅ Staging Deployment
+When a pull request is merged into the staging branch, a GitHub Actions workflow is triggered.
 
+It automatically builds and deploys the latest version of the payment widget to the staging environment (https://payment.stg.bananacrystal.com).
+
+✅ Production Deployment
+When a pull request is merged into the main branch, the production deployment workflow runs.
+
+It builds and deploys the widget to the production environment (https://payment.bananacrystal.com).
 ## License
 
 MIT
