@@ -1,6 +1,7 @@
 "use client";
 
 import { CURRENCIES } from "@/constants";
+import { formatCurrency } from "@/helpers";
 import { useState, useEffect } from "react";
 
 interface StoreDetails {
@@ -37,23 +38,21 @@ export default function StoreIntegration() {
   useEffect(() => {
     const fetchRate = async () => {
       if (!formData.amount || !formData.currency) return;
-  
+
       try {
         setLoading(true);
         setError(null);
-        
+
         // ExchangeRate-API (free tier)
-        const response = await fetch(
-          `https://open.er-api.com/v6/latest/USD`
-        );
+        const response = await fetch(`https://open.er-api.com/v6/latest/USD`);
         const data = await response.json();
-  
+
         if (data.rates && data.rates[formData.currency]) {
           // ExchangeRate-API returns rates relative to base currency (USD)
           const exchangeRate = data.rates[formData.currency];
           // Calculate the banana crystal rate (assuming original rate was USD to target currency)
           const bananaCrystalRate = exchangeRate;
-          
+
           const amountInUsd = parseFloat(formData.amount) / bananaCrystalRate;
           setUsdAmount(amountInUsd);
         } else {
@@ -67,7 +66,7 @@ export default function StoreIntegration() {
         setLoading(false);
       }
     };
-  
+
     fetchRate();
   }, [formData.amount, formData.currency]);
 
@@ -217,7 +216,9 @@ export default function StoreIntegration() {
           <div className="bg-blue-50 p-4 rounded-lg">
             <p className="text-blue-800 text-sm">
               Equivalent in USD:{" "}
-              <span className="font-bold">${usdAmount.toFixed(2)}</span>
+              <span className="font-bold">
+                ${formatCurrency(usdAmount.toFixed(2))}
+              </span>
             </p>
           </div>
         )}

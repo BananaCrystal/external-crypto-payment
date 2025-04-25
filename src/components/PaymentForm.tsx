@@ -24,28 +24,96 @@ export default function PaymentForm({
   wallet_address,
   redirect_url,
 }: PaymentFormProps) {
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phoneNumber: "",
-    address: "",
-    signUpConsent: true,
-    currency: initialCurrency,
-    amount: amount,
-    usd_amount: initialUsdAmount,
-    fees: amount * 0.02, // 2% fee
-    wallet_address: wallet_address,
-    trxn_hash: "",
+  // Initialize state with localStorage values if they exist
+  const [step, setStep] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedStep = localStorage.getItem("paymentStep");
+      return savedStep ? parseInt(savedStep) : 1;
+    }
+    return 1;
   });
-  const [loading, setLoading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(30 * 60); // 30 minutes in seconds
-  const [sessionExpired, setSessionExpired] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [countryCode, setCountryCode] = useState("+234");
 
+  const [formData, setFormData] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedFormData = localStorage.getItem("paymentFormData");
+      if (savedFormData) {
+        return JSON.parse(savedFormData);
+      }
+    }
+    return {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phoneNumber: "",
+      address: "",
+      signUpConsent: true,
+      currency: initialCurrency,
+      amount: amount,
+      usd_amount: initialUsdAmount,
+      fees: amount * 0.02, // 2% fee
+      wallet_address: wallet_address,
+      trxn_hash: "",
+    };
+  });
+
+  const [loading, setLoading] = useState(false);
+
+  // Initialize timer from localStorage or set default (30 minutes)
+  const [timeLeft, setTimeLeft] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedEndTime = localStorage.getItem("paymentEndTime");
+      if (savedEndTime) {
+        const endTime = parseInt(savedEndTime);
+        const now = Math.floor(Date.now() / 1000);
+        const remaining = endTime - now;
+        return remaining > 0 ? remaining : 0;
+      }
+    }
+    return 30 * 60; // 30 minutes in seconds
+  });
+
+  const [sessionExpired, setSessionExpired] = useState(timeLeft <= 0);
+  const [error, setError] = useState<string | null>(null);
+
+  const [countryCode, setCountryCode] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("paymentCountryCode") || "+234";
+    }
+    return "+234";
+  });
+
+  // Save step to localStorage whenever it changes
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("paymentStep", step.toString());
+    }
+  }, [step]);
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("paymentFormData", JSON.stringify(formData));
+    }
+  }, [formData]);
+
+  // Save country code to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("paymentCountryCode", countryCode);
+    }
+  }, [countryCode]);
+
+  // Initialize and manage timer
+  useEffect(() => {
+    // If no end time is set in localStorage, set it
+    if (
+      typeof window !== "undefined" &&
+      !localStorage.getItem("paymentEndTime")
+    ) {
+      const endTime = Math.floor(Date.now() / 1000) + 30 * 60; // Current time + 30 minutes
+      localStorage.setItem("paymentEndTime", endTime.toString());
+    }
+
     if (timeLeft <= 0) {
       setError("Payment session expired. Please start over.");
       setSessionExpired(true);
@@ -53,19 +121,37 @@ export default function PaymentForm({
     }
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          setSessionExpired(true);
-          setError("Payment session expired. Please start over.");
-          clearInterval(timer);
-          return 0;
+      if (typeof window !== "undefined") {
+        const savedEndTime = localStorage.getItem("paymentEndTime");
+        if (savedEndTime) {
+          const endTime = parseInt(savedEndTime);
+          const now = Math.floor(Date.now() / 1000);
+          const remaining = endTime - now;
+
+          if (remaining <= 0) {
+            setTimeLeft(0);
+            setSessionExpired(true);
+            setError("Payment session expired. Please start over.");
+            clearInterval(timer);
+          } else {
+            setTimeLeft(remaining);
+          }
         }
-        return prev - 1;
-      });
+      }
     }, 1000);
 
     return () => clearInterval(timer);
   }, []);
+
+  const resetSession = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("paymentEndTime");
+      localStorage.removeItem("paymentStep");
+      localStorage.removeItem("paymentFormData");
+      localStorage.removeItem("paymentCountryCode");
+      window.location.reload();
+    }
+  };
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -151,40 +237,58 @@ export default function PaymentForm({
         }
       );
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        // Log the full response for debugging
-        console.log("Full API response:", result);
-
-        // Get detailed error message from the API response
-        const errorMessage =
-          result.message || result.error || JSON.stringify(result);
-        throw new Error(errorMessage);
+      // Improved response handling
+      let result;
+      try {
+        result = await response.json();
+      } catch (error) {
+        console.warn("Failed to parse JSON response", error);
+        result = null; // If parsing fails, assume empty response
       }
 
-      // Show success message
-      const successMessage = document.createElement("div");
-      successMessage.className =
-        "fixed top-4 right-4 bg-green-50 text-green-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
-      successMessage.innerHTML = `
-        <div class="flex items-center gap-2">
-          <span>✅</span>
-          <p>Payment verified successfully!</p>
-        </div>
-      `;
-      document.body.appendChild(successMessage);
+      // Check for success: either response.status === 201 or response is empty (no status)
+      if (!response.status || response.status === 201) {
+        console.log("Payment successful:", result || "No response body");
 
-      // Remove success message after 3 seconds
-      setTimeout(() => {
-        successMessage.classList.add("animate-slide-out");
-        setTimeout(() => successMessage.remove(), 300);
-
-        // Redirect after showing success message
-        if (redirect_url) {
-          window.location.href = redirect_url;
+        // Clear localStorage on successful payment
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("paymentEndTime");
+          localStorage.removeItem("paymentStep");
+          localStorage.removeItem("paymentFormData");
+          localStorage.removeItem("paymentCountryCode");
         }
-      }, 3000);
+
+        // Show success message
+        const successMessage = document.createElement("div");
+        successMessage.className =
+          "fixed top-4 right-4 bg-green-50 text-green-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
+        successMessage.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span>✅</span>
+            <p>Payment verified successfully!</p>
+          </div>
+        `;
+        document.body.appendChild(successMessage);
+
+        // Remove success message after 3 seconds
+        setTimeout(() => {
+          successMessage.classList.add("animate-slide-out");
+          setTimeout(() => successMessage.remove(), 300);
+
+          // Redirect after showing success message
+          if (redirect_url) {
+            window.location.href = redirect_url;
+          }
+        }, 3000);
+
+        return; // Stop further execution
+      }
+
+      // Handle failure cases
+      console.log("Full API response:", result);
+      const errorMessage =
+        result?.message || result?.error || "Unknown error occurred";
+      throw new Error(errorMessage);
     } catch (error) {
       // More detailed error handling
       console.error("Payment error (full):", error);
@@ -228,7 +332,7 @@ export default function PaymentForm({
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
 
-    setFormData((prev) => ({
+    setFormData((prev: any) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
@@ -241,22 +345,44 @@ export default function PaymentForm({
   const baseButtonClasses =
     "w-full bg-purple-800 text-white py-4 rounded-lg transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] hover:bg-purple-900 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none";
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+
+    // Show toast notification
+    const toast = document.createElement("div");
+    toast.className =
+      "fixed top-4 right-4 bg-purple-50 text-purple-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
+    toast.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span>📋</span>
+        <p>Address copied to clipboard!</p>
+      </div>
+    `;
+    document.body.appendChild(toast);
+
+    // Remove toast after 2 seconds
+    setTimeout(() => {
+      toast.classList.add("animate-slide-out");
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  };
+
   if (step === 1) {
     return (
-      <div className="max-w-md w-full mx-auto bg-white rounded-xl shadow-2xl p-8 transform transition-all duration-500">
-        <h2 className="text-3xl font-bold mb-8 text-gray-900 text-center">
+      <div className="max-w-xl w-full mx-auto bg-white rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500">
+        <h2 className="text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">
           Payment Details
         </h2>
 
-        <div className="space-y-6 mb-8">
-          <div className="bg-purple-50 rounded-lg p-6">
+        <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
+          <div className="bg-purple-50 rounded-lg p-4 sm:p-6">
             <div className="flex items-center gap-3 text-gray-900">
               <span className="text-2xl">🛍️</span>
               <p className="text-lg font-medium">{description}</p>
             </div>
           </div>
 
-          <div className="bg-blue-50 rounded-lg p-6">
+          <div className="bg-blue-50 rounded-lg p-4 sm:p-6">
             <div className="text-center">
               <div className="text-blue-800 font-medium mb-2">
                 Time Remaining
@@ -282,12 +408,12 @@ export default function PaymentForm({
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-gray-50 rounded-lg p-6 border border-gray-100">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+          <div className="bg-gray-50 rounded-lg p-4 sm:p-6 border border-gray-100">
             <div className="flex justify-between mb-3">
               <span className="text-gray-600">Amount:</span>
               <span className="font-bold text-gray-900">
-                {formatCurrency(amount)} {(formData.currency)}
+                {formatCurrency(amount)} {formData.currency}
               </span>
             </div>
             <div className="flex justify-between font-bold">
@@ -298,7 +424,7 @@ export default function PaymentForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label
                 htmlFor="firstName"
@@ -371,12 +497,12 @@ export default function PaymentForm({
               <select
                 value={countryCode}
                 onChange={(e) => setCountryCode(e.target.value)}
-                className={`${baseSelectClasses} rounded-r-none border-r-0 w-20 bg-gray-100`}
+                className={`${baseSelectClasses} rounded-r-none border-r-0 w-24 bg-gray-100`}
                 disabled={timeLeft <= 0}
               >
                 {COUNTRY_CODES.map((country) => (
                   <option key={country.code} value={country.code}>
-                    {country.code} ({country.country})
+                    {country.code}
                   </option>
                 ))}
               </select>
@@ -414,62 +540,45 @@ export default function PaymentForm({
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="signUpConsent"
-              name="signUpConsent"
-              checked={formData.signUpConsent}
-              onChange={handleInputChange}
-              className="h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-            />
-            <label htmlFor="signUpConsent" className="text-sm text-gray-600">
-              I agree to sign up for BananaCrystal and accept the terms of
-              service
-            </label>
-          </div>
-
-          <button
-            type="submit"
-            className={baseButtonClasses}
-            disabled={loading || timeLeft <= 0}
-          >
-            {timeLeft <= 0 ? "Session Expired" : "Next →"}
-          </button>
+          {!sessionExpired ? (
+            <button
+              type="submit"
+              className={baseButtonClasses}
+              disabled={loading || timeLeft <= 0}
+            >
+              {timeLeft <= 0 ? "Session Expired" : "Next →"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={resetSession}
+              className={baseButtonClasses}
+            >
+              Start New Session
+            </button>
+          )}
         </form>
       </div>
     );
   }
 
   return (
-    <div className="max-w-md w-full mx-auto bg-white rounded-xl shadow-2xl p-8 transform transition-all duration-500">
-      <h2 className="text-3xl font-bold mb-8 text-gray-900 text-center">
+    <div className="max-w-xl w-full mx-auto bg-white rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500">
+      <h2 className="text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">
         Make Payment
       </h2>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-gray-50 rounded-lg p-6 border border-gray-100">
-          <div className="flex justify-between mb-3">
-            <span className="text-gray-600">Amount:</span>
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+        <div className="bg-gray-50 rounded-lg p-4 sm:p-6 border border-gray-100">
+          <div className="flex justify-between font-bold">
+            <span className="text-gray-900">Total Amount:</span>
             <span className="text-gray-900">
               {formatCurrency(formData.amount)} {formData.currency}
             </span>
           </div>
-          <div className="flex justify-between mb-3">
-            <span className="text-gray-600">Fee:</span>
-            <span className="text-orange-500">
-              {formData.fees.toFixed(2)} {formData.currency}
-            </span>
-          </div>
-          <div className="flex justify-between font-bold">
-            <span className="text-gray-900">Total Amount:</span>
-            <span className="text-gray-900">
-              {(formatCurrency(formData.amount + formData.fees))} {formData.currency}
-            </span>
-          </div>
         </div>
 
-        <div className="bg-blue-50 rounded-lg p-6">
+        <div className="bg-blue-50 rounded-lg p-4 sm:p-6">
           <div className="text-center">
             <div className="text-blue-800 font-medium mb-2">Time Remaining</div>
             <div
@@ -482,40 +591,85 @@ export default function PaymentForm({
           </div>
         </div>
 
-        <div className="bg-purple-50 rounded-lg p-6">
+        <div className="bg-purple-50 rounded-lg p-4 sm:p-6">
           <div className="text-center">
             <div className="text-purple-800 font-medium mb-2">
               USDT Amount to Pay
             </div>
             <div className="text-3xl font-bold text-gray-900">
-              ${formData.usd_amount.toFixed(2)} USDT
+              ${formatCurrency(formData.usd_amount.toFixed(2))} USDT
             </div>
           </div>
         </div>
 
-        <div className="bg-gray-50 rounded-lg p-6 border border-gray-100">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-gray-900 font-medium">
-              Recipient Address (Polygon)
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(formData.wallet_address);
-                alert("Address copied to clipboard!");
-              }}
-              className="text-purple-600 hover:text-purple-800 text-sm font-medium"
-            >
-              Copy
-            </button>
+        {/* Improved wallet address section */}
+        <div className="bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-700 text-white">
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-white font-bold text-base sm:text-lg">
+                Send Payment To This Address
+              </span>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(formData.wallet_address)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm font-medium flex items-center"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 mr-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
+                  />
+                </svg>
+                Copy
+              </button>
+            </div>
+            <div className="bg-gray-900 p-3 sm:p-4 rounded-lg border border-gray-700">
+              <p className="font-mono text-sm sm:text-base break-all text-green-400 select-all">
+                {formData.wallet_address}
+              </p>
+            </div>
+            <p className="text-xs sm:text-sm text-gray-300 mt-2 text-center">
+              Polygon/MATIC Network Only
+            </p>
           </div>
-          <p className="font-mono text-sm break-all text-gray-600">
-            {formData.wallet_address}
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Send exactly ${formData.usd_amount.toFixed(2)} USDT to the store's
-            wallet address on the Polygon network
-          </p>
+
+          <div className="bg-yellow-800 p-3 sm:p-4 rounded-lg">
+            <div className="flex items-start">
+              <div className="text-yellow-300 mr-2 text-lg flex-shrink-0">
+                ⚠️
+              </div>
+              <div>
+                <p className="text-yellow-200 font-medium">
+                  Important Instructions:
+                </p>
+                <ul className="list-disc pl-4 mt-2 text-yellow-100 text-xs sm:text-sm space-y-1">
+                  <li>
+                    Send{" "}
+                    <span className="font-bold text-white">
+                      ${formatCurrency(formData.usd_amount.toFixed(2))} USDT
+                    </span>{" "}
+                    to the address above
+                  </li>
+                  <li>
+                    Make sure you're using the{" "}
+                    <span className="font-bold text-white">
+                      Polygon/MATIC Network
+                    </span>
+                  </li>
+                  <li>After sending, copy your transaction hash below</li>
+                  <li>Payments on other networks will be lost</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div>
@@ -536,7 +690,7 @@ export default function PaymentForm({
             disabled={timeLeft <= 0}
             placeholder="0x..."
           />
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">
             Enter the transaction hash after sending the USDT payment
           </p>
         </div>
@@ -550,7 +704,7 @@ export default function PaymentForm({
         )}
 
         {sessionExpired ? (
-          <div className="bg-red-50 rounded-lg p-6 text-center">
+          <div className="bg-red-50 rounded-lg p-4 sm:p-6 text-center">
             <p className="text-red-800 font-medium mb-4">
               Payment Session Expired
             </p>
@@ -560,44 +714,54 @@ export default function PaymentForm({
             </p>
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={resetSession}
               className="bg-purple-800 text-white px-6 py-2 rounded-lg hover:bg-purple-900 transition-colors"
             >
               Start Over
             </button>
           </div>
         ) : (
-          <button
-            type="submit"
-            className={baseButtonClasses}
-            disabled={loading || timeLeft <= 0}
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Processing...
-              </span>
-            ) : timeLeft <= 0 ? (
-              "Session Expired"
-            ) : (
-              "Confirm Payment"
-            )}
-          </button>
+          <div className="space-y-4">
+            <button
+              type="submit"
+              className={baseButtonClasses}
+              disabled={loading || timeLeft <= 0}
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Processing...
+                </span>
+              ) : timeLeft <= 0 ? (
+                "Session Expired"
+              ) : (
+                "Confirm Payment"
+              )}
+            </button>
+
+            <button
+              type="button"
+              className="w-full bg-gray-200 text-gray-800 py-3 rounded-lg transition-all duration-300 hover:bg-gray-300"
+              onClick={() => setStep(1)}
+            >
+              Back to Details
+            </button>
+          </div>
         )}
       </form>
     </div>
