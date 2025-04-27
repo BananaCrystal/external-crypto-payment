@@ -6,7 +6,6 @@ import { COUNTRY_CODES } from "@/constants";
 import { formatCurrency } from "@/helpers";
 import { LogoComponent } from "./LogoComponent";
 
-
 interface PaymentFormProps {
   storeId: string;
   amount: number;
@@ -112,11 +111,11 @@ export default function PaymentForm({
   // Function to send data to CRM
   const sendToCRM = async (status: "incomplete" | "complete") => {
     if (!crmDetails) return;
-    
+
     try {
       // Construct full address from components
       const fullAddress = `${formData.street}, ${formData.city}, ${formData.state}, ${formData.postalCode}, ${formData.country}`;
-      
+
       const crmData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -127,9 +126,9 @@ export default function PaymentForm({
         currency: formData.currency,
         status: status,
         paymentDate: status === "complete" ? new Date().toISOString() : null,
-        transactionHash: status === "complete" ? formData.trxn_hash : null
+        transactionHash: status === "complete" ? formData.trxn_hash : null,
       };
-      
+
       // Generic CRM integration endpoint (frontend proxy)
       await fetch("/api/crm-integration", {
         method: "POST",
@@ -140,12 +139,15 @@ export default function PaymentForm({
           provider: crmDetails.provider,
           apiKey: crmDetails.apiKey,
           listId: crmDetails.listId,
-          tag: status === "complete" ? "payment_completed" : "payment_initiated",
-          userData: crmData
+          tag:
+            status === "complete" ? "payment_completed" : "payment_initiated",
+          userData: crmData,
         }),
       });
-      
-      console.log(`Data sent to ${crmDetails.provider} CRM with status: ${status}`);
+
+      console.log(
+        `Data sent to ${crmDetails.provider} CRM with status: ${status}`
+      );
     } catch (error) {
       console.error("Failed to send data to CRM:", error);
       // Non-blocking error - continue with payment flow
@@ -160,7 +162,7 @@ export default function PaymentForm({
         setError("Please accept the terms of service to continue");
         return;
       }
-      
+
       // Send incomplete data to CRM when proceeding to payment step
       await sendToCRM("incomplete");
       setStep(2);
@@ -607,8 +609,6 @@ export default function PaymentForm({
             </div>
           </div>
 
-        
-
           <button
             type="submit"
             className={baseButtonClasses}
@@ -651,20 +651,20 @@ export default function PaymentForm({
         </div>
 
         {/* Improved wallet address section */}
-        <div className="bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-700 text-white">
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-white font-bold text-base sm:text-lg">
+        <div className="bg-gradient-to-br from-purple-900 via-purple-800 to-purple-900 rounded-2xl p-6 sm:p-8 border border-purple-700 text-white shadow-2xl">
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <span className="font-bold text-lg sm:text-xl">
                 Send Payment To This Address
               </span>
               <button
                 type="button"
                 onClick={() => copyToClipboard(formData.wallet_address)}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm font-medium flex items-center"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-semibold flex items-center transition"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 mr-1"
+                  className="h-5 w-5 mr-2"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -679,26 +679,25 @@ export default function PaymentForm({
                 Copy
               </button>
             </div>
-            <div className="bg-gray-900 p-3 sm:p-4 rounded-lg border border-gray-700">
-              <p className="font-mono text-sm sm:text-base break-all text-green-400 select-all">
+
+            <div className="bg-orange-100/10 p-4 rounded-xl border border-orange-400/30">
+              <p className="font-mono text-base sm:text-lg break-words text-green-400 select-all">
                 {formData.wallet_address}
               </p>
             </div>
-            <p className="text-xs sm:text-sm text-gray-300 mt-2 text-center">
+            <p className="text-xs sm:text-sm text-white/70 mt-3 text-center">
               Polygon/MATIC Network Only
             </p>
           </div>
 
-          <div className="bg-yellow-800 p-3 sm:p-4 rounded-lg">
-            <div className="flex items-start">
-              <div className="text-yellow-300 mr-2 text-lg flex-shrink-0">
-                ⚠️
-              </div>
+          <div className="bg-orange-100/10 p-4 rounded-xl border border-orange-400/30">
+            <div className="flex items-start space-x-3">
+              <div className="text-yellow-300 text-xl flex-shrink-0">⚠️</div>
               <div>
-                <p className="text-yellow-200 font-medium">
+                <p className="text-orange-300 font-semibold text-base">
                   Important Instructions:
                 </p>
-                <ul className="list-disc pl-4 mt-2 text-yellow-100 text-xs sm:text-sm space-y-1">
+                <ul className="list-disc pl-5 mt-2 space-y-2 text-sm sm:text-base text-orange-200">
                   <li>
                     Send{" "}
                     <span className="font-bold text-white">
