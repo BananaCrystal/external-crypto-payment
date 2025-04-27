@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { PaymentDetails } from "@/types";
 import { COUNTRY_CODES } from "@/constants";
 import { formatCurrency } from "@/helpers";
+import { LogoComponent } from "./LogoComponent";
+
 
 interface PaymentFormProps {
   storeId: string;
@@ -13,6 +15,12 @@ interface PaymentFormProps {
   usd_amount: number;
   wallet_address: string;
   redirect_url?: string;
+  crmDetails?: {
+    provider: string;
+    apiKey: string;
+    listId: string;
+    tag: string;
+  };
 }
 
 export default function PaymentForm({
@@ -23,6 +31,7 @@ export default function PaymentForm({
   usd_amount: initialUsdAmount,
   wallet_address,
   redirect_url,
+  crmDetails,
 }: PaymentFormProps) {
   // Initialize state with localStorage values if they exist
   const [step, setStep] = useState(() => {
@@ -45,7 +54,11 @@ export default function PaymentForm({
       lastName: "",
       email: "",
       phoneNumber: "",
-      address: "",
+      street: "",
+      city: "",
+      state: "",
+      postalCode: "",
+      country: "Nigeria",
       signUpConsent: true,
       currency: initialCurrency,
       amount: amount,
@@ -57,22 +70,6 @@ export default function PaymentForm({
   });
 
   const [loading, setLoading] = useState(false);
-
-  // Initialize timer from localStorage or set default (30 minutes)
-  const [timeLeft, setTimeLeft] = useState(() => {
-    if (typeof window !== "undefined") {
-      const savedEndTime = localStorage.getItem("paymentEndTime");
-      if (savedEndTime) {
-        const endTime = parseInt(savedEndTime);
-        const now = Math.floor(Date.now() / 1000);
-        const remaining = endTime - now;
-        return remaining > 0 ? remaining : 0;
-      }
-    }
-    return 30 * 60; // 30 minutes in seconds
-  });
-
-  const [sessionExpired, setSessionExpired] = useState(timeLeft <= 0);
   const [error, setError] = useState<string | null>(null);
 
   const [countryCode, setCountryCode] = useState(() => {
@@ -103,49 +100,8 @@ export default function PaymentForm({
     }
   }, [countryCode]);
 
-  // Initialize and manage timer
-  useEffect(() => {
-    // If no end time is set in localStorage, set it
-    if (
-      typeof window !== "undefined" &&
-      !localStorage.getItem("paymentEndTime")
-    ) {
-      const endTime = Math.floor(Date.now() / 1000) + 30 * 60; // Current time + 30 minutes
-      localStorage.setItem("paymentEndTime", endTime.toString());
-    }
-
-    if (timeLeft <= 0) {
-      setError("Payment session expired. Please start over.");
-      setSessionExpired(true);
-      return;
-    }
-
-    const timer = setInterval(() => {
-      if (typeof window !== "undefined") {
-        const savedEndTime = localStorage.getItem("paymentEndTime");
-        if (savedEndTime) {
-          const endTime = parseInt(savedEndTime);
-          const now = Math.floor(Date.now() / 1000);
-          const remaining = endTime - now;
-
-          if (remaining <= 0) {
-            setTimeLeft(0);
-            setSessionExpired(true);
-            setError("Payment session expired. Please start over.");
-            clearInterval(timer);
-          } else {
-            setTimeLeft(remaining);
-          }
-        }
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
   const resetSession = () => {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("paymentEndTime");
       localStorage.removeItem("paymentStep");
       localStorage.removeItem("paymentFormData");
       localStorage.removeItem("paymentCountryCode");
@@ -153,35 +109,72 @@ export default function PaymentForm({
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  // Function to send data to CRM
+  const sendToCRM = async (status: "incomplete" | "complete") => {
+    if (!crmDetails) return;
+    
+    try {
+      // Construct full address from components
+      const fullAddress = `${formData.street}, ${formData.city}, ${formData.state}, ${formData.postalCode}, ${formData.country}`;
+      
+      const crmData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: `${countryCode}${formData.phoneNumber}`,
+        address: fullAddress,
+        amount: formData.amount,
+        currency: formData.currency,
+        status: status,
+        paymentDate: status === "complete" ? new Date().toISOString() : null,
+        transactionHash: status === "complete" ? formData.trxn_hash : null
+      };
+      
+      // Generic CRM integration endpoint (frontend proxy)
+      await fetch("/api/crm-integration", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          provider: crmDetails.provider,
+          apiKey: crmDetails.apiKey,
+          listId: crmDetails.listId,
+          tag: status === "complete" ? "payment_completed" : "payment_initiated",
+          userData: crmData
+        }),
+      });
+      
+      console.log(`Data sent to ${crmDetails.provider} CRM with status: ${status}`);
+    } catch (error) {
+      console.error("Failed to send data to CRM:", error);
+      // Non-blocking error - continue with payment flow
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (timeLeft <= 0) {
-      setError("Payment session expired. Please start over.");
-      return;
-    }
 
     if (step === 1) {
       if (!formData.signUpConsent) {
         setError("Please accept the terms of service to continue");
         return;
       }
+      
+      // Send incomplete data to CRM when proceeding to payment step
+      await sendToCRM("incomplete");
       setStep(2);
       return;
     }
 
+    // Validate all required fields
     if (
       !formData.firstName ||
       !formData.lastName ||
       !formData.email ||
       !formData.phoneNumber ||
-      !formData.address ||
+      !formData.street ||
+      !formData.city ||
       !formData.trxn_hash
     ) {
       setError("Please fill in all required fields");
@@ -191,6 +184,9 @@ export default function PaymentForm({
     try {
       setLoading(true);
       setError(null);
+
+      // Construct full address from components
+      const fullAddress = `${formData.street}, ${formData.city}, ${formData.state}, ${formData.postalCode}, ${formData.country}`;
 
       // Sign up user
       try {
@@ -204,7 +200,7 @@ export default function PaymentForm({
             last_name: formData.lastName,
             email: formData.email,
             phone: `${countryCode}${formData.phoneNumber}`,
-            address: formData.address,
+            address: fullAddress,
           }),
         });
       } catch (error) {
@@ -229,7 +225,7 @@ export default function PaymentForm({
             last_name: formData.lastName,
             email: formData.email,
             phone: `${countryCode}${formData.phoneNumber}`,
-            address: formData.address,
+            address: fullAddress,
             trxn_hash: formData.trxn_hash,
             signup_consent: formData.signUpConsent,
             wallet_address: formData.wallet_address,
@@ -250,9 +246,11 @@ export default function PaymentForm({
       if (!response.status || response.status === 201) {
         console.log("Payment successful:", result || "No response body");
 
+        // Send completed data to CRM after successful payment
+        await sendToCRM("complete");
+
         // Clear localStorage on successful payment
         if (typeof window !== "undefined") {
-          localStorage.removeItem("paymentEndTime");
           localStorage.removeItem("paymentStep");
           localStorage.removeItem("paymentFormData");
           localStorage.removeItem("paymentCountryCode");
@@ -367,6 +365,22 @@ export default function PaymentForm({
     }, 2000);
   };
 
+  const BananaCrystalFooter = () => (
+    <div className="mt-8 pt-6 border-t border-gray-200">
+      <div className="flex justify-center items-center opacity-80 hover:opacity-100 transition-opacity">
+        <span className="text-gray-500 text-sm mr-2">Powered by</span>
+        <a
+          href="https://bananacrystal.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center"
+        >
+          <LogoComponent />
+        </a>
+      </div>
+    </div>
+  );
+
   if (step === 1) {
     return (
       <div className="max-w-xl w-full mx-auto bg-white rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500">
@@ -379,23 +393,6 @@ export default function PaymentForm({
             <div className="flex items-center gap-3 text-gray-900">
               <span className="text-2xl">🛍️</span>
               <p className="text-lg font-medium">{description}</p>
-            </div>
-          </div>
-
-          <div className="bg-blue-50 rounded-lg p-4 sm:p-6">
-            <div className="text-center">
-              <div className="text-blue-800 font-medium mb-2">
-                Time Remaining
-              </div>
-              <div
-                className={`text-3xl font-bold ${
-                  timeLeft <= 300
-                    ? "text-red-600 animate-pulse"
-                    : "text-blue-900"
-                }`}
-              >
-                {formatTime(timeLeft)}
-              </div>
             </div>
           </div>
 
@@ -440,7 +437,6 @@ export default function PaymentForm({
                 className={baseInputClasses}
                 value={formData.firstName}
                 onChange={handleInputChange}
-                disabled={timeLeft <= 0}
                 placeholder="John"
               />
             </div>
@@ -460,7 +456,6 @@ export default function PaymentForm({
                 className={baseInputClasses}
                 value={formData.lastName}
                 onChange={handleInputChange}
-                disabled={timeLeft <= 0}
                 placeholder="Doe"
               />
             </div>
@@ -481,7 +476,6 @@ export default function PaymentForm({
               className={baseInputClasses}
               value={formData.email}
               onChange={handleInputChange}
-              disabled={timeLeft <= 0}
               placeholder="john@example.com"
             />
           </div>
@@ -498,7 +492,6 @@ export default function PaymentForm({
                 value={countryCode}
                 onChange={(e) => setCountryCode(e.target.value)}
                 className={`${baseSelectClasses} rounded-r-none border-r-0 w-24 bg-gray-100`}
-                disabled={timeLeft <= 0}
               >
                 {COUNTRY_CODES.map((country) => (
                   <option key={country.code} value={country.code}>
@@ -514,50 +507,118 @@ export default function PaymentForm({
                 className={`${baseInputClasses} rounded-l-none`}
                 value={formData.phoneNumber}
                 onChange={handleInputChange}
-                disabled={timeLeft <= 0}
                 placeholder="8012345678"
               />
             </div>
           </div>
 
+          {/* Expanded Address Fields */}
           <div>
             <label
-              htmlFor="address"
+              htmlFor="street"
               className="block text-gray-900 mb-2 font-medium"
             >
-              Address
+              Street Address
             </label>
             <input
               type="text"
-              id="address"
-              name="address"
+              id="street"
+              name="street"
               required
               className={baseInputClasses}
-              value={formData.address}
+              value={formData.street}
               onChange={handleInputChange}
-              disabled={timeLeft <= 0}
-              placeholder="123 Main St, City"
+              placeholder="123 Main St"
             />
           </div>
 
-          {!sessionExpired ? (
-            <button
-              type="submit"
-              className={baseButtonClasses}
-              disabled={loading || timeLeft <= 0}
-            >
-              {timeLeft <= 0 ? "Session Expired" : "Next →"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={resetSession}
-              className={baseButtonClasses}
-            >
-              Start New Session
-            </button>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="city"
+                className="block text-gray-900 mb-2 font-medium"
+              >
+                City
+              </label>
+              <input
+                type="text"
+                id="city"
+                name="city"
+                required
+                className={baseInputClasses}
+                value={formData.city}
+                onChange={handleInputChange}
+                placeholder="City"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="state"
+                className="block text-gray-900 mb-2 font-medium"
+              >
+                State/Province
+              </label>
+              <input
+                type="text"
+                id="state"
+                name="state"
+                className={baseInputClasses}
+                value={formData.state}
+                onChange={handleInputChange}
+                placeholder="State"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="postalCode"
+                className="block text-gray-900 mb-2 font-medium"
+              >
+                Postal/ZIP Code
+              </label>
+              <input
+                type="text"
+                id="postalCode"
+                name="postalCode"
+                className={baseInputClasses}
+                value={formData.postalCode}
+                onChange={handleInputChange}
+                placeholder="Postal Code"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="country"
+                className="block text-gray-900 mb-2 font-medium"
+              >
+                Country
+              </label>
+              <input
+                type="text"
+                id="country"
+                name="country"
+                className={baseInputClasses}
+                value={formData.country}
+                onChange={handleInputChange}
+                placeholder="Country"
+              />
+            </div>
+          </div>
+
+        
+
+          <button
+            type="submit"
+            className={baseButtonClasses}
+            disabled={loading}
+          >
+            Next →
+          </button>
         </form>
+
+        <BananaCrystalFooter />
       </div>
     );
   }
@@ -575,19 +636,6 @@ export default function PaymentForm({
             <span className="text-gray-900">
               {formatCurrency(formData.amount)} {formData.currency}
             </span>
-          </div>
-        </div>
-
-        <div className="bg-blue-50 rounded-lg p-4 sm:p-6">
-          <div className="text-center">
-            <div className="text-blue-800 font-medium mb-2">Time Remaining</div>
-            <div
-              className={`text-3xl font-bold ${
-                timeLeft <= 300 ? "text-red-600 animate-pulse" : "text-blue-900"
-              }`}
-            >
-              {formatTime(timeLeft)}
-            </div>
           </div>
         </div>
 
@@ -687,7 +735,6 @@ export default function PaymentForm({
             className={baseInputClasses}
             value={formData.trxn_hash}
             onChange={handleInputChange}
-            disabled={timeLeft <= 0}
             placeholder="0x..."
           />
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
@@ -703,67 +750,48 @@ export default function PaymentForm({
           </div>
         )}
 
-        {sessionExpired ? (
-          <div className="bg-red-50 rounded-lg p-4 sm:p-6 text-center">
-            <p className="text-red-800 font-medium mb-4">
-              Payment Session Expired
-            </p>
-            <p className="text-gray-600 mb-4">
-              The payment session has expired. Please start over to generate a
-              new payment link.
-            </p>
-            <button
-              type="button"
-              onClick={resetSession}
-              className="bg-purple-800 text-white px-6 py-2 rounded-lg hover:bg-purple-900 transition-colors"
-            >
-              Start Over
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <button
-              type="submit"
-              className={baseButtonClasses}
-              disabled={loading || timeLeft <= 0}
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Processing...
-                </span>
-              ) : timeLeft <= 0 ? (
-                "Session Expired"
-              ) : (
-                "Confirm Payment"
-              )}
-            </button>
+        <div className="space-y-4">
+          <button
+            type="submit"
+            className={baseButtonClasses}
+            disabled={loading}
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Processing...
+              </span>
+            ) : (
+              "Confirm Payment"
+            )}
+          </button>
 
-            <button
-              type="button"
-              className="w-full bg-gray-200 text-gray-800 py-3 rounded-lg transition-all duration-300 hover:bg-gray-300"
-              onClick={() => setStep(1)}
-            >
-              Back to Details
-            </button>
-          </div>
-        )}
+          <button
+            type="button"
+            className="w-full bg-gray-200 text-gray-800 py-3 rounded-lg transition-all duration-300 hover:bg-gray-300"
+            onClick={() => setStep(1)}
+          >
+            Back to Details
+          </button>
+        </div>
       </form>
+
+      <BananaCrystalFooter />
     </div>
   );
 }
