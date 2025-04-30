@@ -3,12 +3,10 @@ import { FormData, StoreDetails, CrmDetails } from "@/types/paymentTypes";
 import { formatCurrency } from "@/helpers";
 import { COUNTRY_CODES } from "@/constants/countries";
 import {
-  brandPurple,
   baseInputClasses,
   baseSelectClasses,
   baseButtonClasses,
 } from "@/styles/paymentStyles";
-import { PROCESSING_FEE_PERCENTAGE } from "@/constants/paymentConstants"; // Import fee constant
 
 interface PaymentDetailsStepProps {
   formData: Omit<FormData, "wallet_address">;

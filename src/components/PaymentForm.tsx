@@ -2,12 +2,10 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
-// Import types from new file
 import { PaymentFormProps, StoreDetails, FormData } from "@/types/paymentTypes";
 
 import { safeJsonParse } from "@/helpers/paymentHelpers";
 
-// Import constants from new file
 import {
   PROCESSING_FEE_PERCENTAGE,
   TIMER_DURATION,
@@ -32,14 +30,13 @@ export default function PaymentForm({
   walletAddressFromParams,
   crmDetails,
 }: PaymentFormProps) {
-  // Construct full API URLs
   const STORE_API_URL = `${STORE_API_BASE_URL}/stores/${storeId}`;
   const PAYMENT_API_URL = `${PAYMENT_API_BASE_URL}/stores/${storeId}/external_store_payments`;
 
-  // State for the current step (1: Details, 2: Payment)
   const [step, setStep] = useState(() => {
     if (typeof window !== "undefined") {
       const savedStep = localStorage.getItem("paymentStep");
+
       return savedStep ? parseInt(savedStep) : 1;
     }
     return 1;
@@ -48,6 +45,7 @@ export default function PaymentForm({
   const [formData, setFormData] = useState<Omit<FormData, "wallet_address">>(
     () => {
       const savedFormData = safeJsonParse("paymentFormData");
+
       return {
         firstName: savedFormData?.firstName || "",
         lastName: savedFormData?.lastName || "",
@@ -69,6 +67,7 @@ export default function PaymentForm({
   // State for phone number country code
   const [countryCode, setCountryCode] = useState(() => {
     if (typeof window !== "undefined") {
+      // Keep the saved country code for persistence
       return (
         localStorage.getItem("paymentCountryCode") ||
         COUNTRY_CODES[0]?.code ||
@@ -115,13 +114,12 @@ export default function PaymentForm({
 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Determine the effective wallet address: fetched data first, then prop
+  // effectiveWalletAddress correctly prioritizes storeDetails over walletAddressFromParams, and updates automatically
   const effectiveWalletAddress = useMemo(
     () => storeDetails?.wallet_address || walletAddressFromParams,
     [storeDetails, walletAddressFromParams]
   );
 
-  // Check if we can proceed to payment (requires effective wallet address)
   const canProceedToPayment = useMemo(
     () => !!effectiveWalletAddress,
     [effectiveWalletAddress]
@@ -180,6 +178,40 @@ export default function PaymentForm({
     fetchStoreDetails();
   }, [storeId, STORE_API_URL]);
 
+  useEffect(() => {
+    // Check if the current formData state values differ from the initial props
+    const amountChanged =
+      initialAmount !== undefined && formData.amount !== initialAmount;
+    const currencyChanged =
+      initialCurrency !== undefined && formData.currency !== initialCurrency;
+    const usdAmountChanged =
+      initialUsdAmount !== undefined &&
+      formData.usd_amount !== initialUsdAmount;
+
+    if (amountChanged || currencyChanged || usdAmountChanged) {
+      console.log(
+        "Detected change in initial props. Updating state and localStorage."
+      );
+      setFormData((prevFormData) => {
+        const newFormData = {
+          ...prevFormData,
+
+          amount: amountChanged ? initialAmount : prevFormData.amount,
+          currency: currencyChanged ? initialCurrency : prevFormData.currency,
+          usd_amount: usdAmountChanged
+            ? initialUsdAmount
+            : prevFormData.usd_amount,
+        };
+
+        if (typeof window !== "undefined") {
+          localStorage.setItem("paymentFormData", JSON.stringify(newFormData));
+        }
+
+        return newFormData;
+      });
+    }
+  }, [initialAmount, initialCurrency, initialUsdAmount]);
+
   // --- Timer Effect ---
   useEffect(() => {
     if (step === 2 && timerActive) {
@@ -193,8 +225,10 @@ export default function PaymentForm({
             clearInterval(timerIntervalRef.current!);
             timerIntervalRef.current = null;
             setTimerActive(false);
-            localStorage.setItem("paymentTimerActive", "false");
-            localStorage.setItem("paymentTimeLeft", "0");
+            if (typeof window !== "undefined") {
+              localStorage.setItem("paymentTimerActive", "false");
+              localStorage.setItem("paymentTimeLeft", "0");
+            }
             setError("Payment window expired. Please request more time.");
             return 0;
           }
@@ -216,11 +250,10 @@ export default function PaymentForm({
     };
   }, [step, timerActive]);
 
-  // --- localStorage Save Effect ---
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("paymentStep", step.toString());
-      localStorage.setItem("paymentFormData", JSON.stringify(formData));
+
       localStorage.setItem("paymentCountryCode", countryCode);
       if (step === 2 || timerActive) {
         localStorage.setItem("paymentTimeLeft", timeLeft.toString());
@@ -230,23 +263,17 @@ export default function PaymentForm({
         localStorage.removeItem("paymentTimerActive");
       }
     }
-  }, [step, formData, countryCode, timeLeft, timerActive]);
+  }, [step, countryCode, timeLeft, timerActive]); // Removed formData from dependencies
 
   // Function to reset the payment session
   const resetSession = useCallback(() => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("paymentStep");
-      localStorage.removeItem("paymentFormData");
-      localStorage.removeItem("paymentCountryCode");
-      localStorage.removeItem("paymentTimeLeft");
-      localStorage.removeItem("paymentTimerActive");
-      window.location.reload();
-    }
+    setStep(1);
   }, []);
 
   // Function to send data to CRM
   const sendToCRM = useCallback(
     async (status: "incomplete" | "complete") => {
+      // ... (CRM logic remains the same)
       if (!crmDetails || !crmDetails.enabled) return;
 
       try {
@@ -258,14 +285,14 @@ export default function PaymentForm({
           email: formData.email,
           phone: `${countryCode}${formData.phoneNumber}`,
           address: fullAddress,
-          amount: formData.amount,
-          currency: formData.currency,
+          amount: formData.amount, // Use state value
+          currency: formData.currency, // Use state value
           status: status,
           paymentDate: status === "complete" ? new Date().toISOString() : null,
           transactionHash: status === "complete" ? formData.trxn_hash : null,
           storeId: storeId,
           storeName: storeDetails?.name || "Unknown Store",
-          usdAmount: formData.usd_amount,
+          usdAmount: formData.usd_amount, // Use state value
           description: description,
           processingFee: processingFee,
           totalAmountDue: totalAmountDue,
@@ -296,6 +323,7 @@ export default function PaymentForm({
         console.error("Failed to send data to CRM:", error);
       }
     },
+
     [
       crmDetails,
       formData,
@@ -329,7 +357,17 @@ export default function PaymentForm({
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
-        setFormData((prev) => ({ ...prev, trxn_hash: text }));
+        setFormData((prev) => {
+          const newFormData = { ...prev, trxn_hash: text };
+          // Save to localStorage immediately on user input change
+          if (typeof window !== "undefined") {
+            localStorage.setItem(
+              "paymentFormData",
+              JSON.stringify(newFormData)
+            );
+          }
+          return newFormData;
+        });
       }
     } catch (err) {
       console.error("Failed to paste from clipboard:", err);
@@ -340,66 +378,84 @@ export default function PaymentForm({
     async (e: React.FormEvent) => {
       e.preventDefault();
       setError(null);
-
-      if (step === 1) {
-        if (
-          !formData.firstName ||
-          !formData.lastName ||
-          !formData.email ||
-          !formData.phoneNumber ||
-          !formData.street ||
-          !formData.city ||
-          !formData.country
-        ) {
-          setError("Please fill in all required contact and address fields.");
-          return;
-        }
-
-        if (!canProceedToPayment) {
-          setError(
-            "Payment address is not available. Cannot proceed to payment."
-          );
-          console.error("Cannot proceed: Effective wallet address is missing.");
-          return;
-        }
-
-        await sendToCRM("incomplete");
-        setStep(2);
-        setTimeLeft(TIMER_DURATION);
-        setTimerActive(true);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("paymentTimeLeft", TIMER_DURATION.toString());
-          localStorage.setItem("paymentTimerActive", "true");
-          localStorage.setItem("paymentStep", "2");
-        }
-
-        return;
-      }
-
-      if (!timerActive) {
-        setError("Payment window expired. Please request more time.");
-        return;
-      }
-
-      if (!formData.trxn_hash) {
-        setError("Please enter the transaction hash to confirm payment.");
-        return;
-      }
-
-      if (!effectiveWalletAddress) {
-        setError("Payment address not available. Cannot proceed with payment.");
-        console.error(
-          "Payment attempt failed: Effective wallet address is missing."
-        );
-        return;
-      }
+      setLoading(true);
 
       try {
-        setLoading(true);
-        setError(null);
+        if (step === 1) {
+          if (
+            !formData.firstName ||
+            !formData.lastName ||
+            !formData.email ||
+            !formData.phoneNumber ||
+            !formData.street ||
+            !formData.city ||
+            !formData.country
+          ) {
+            setError("Please fill in all required contact and address fields.");
+            setLoading(false);
+            return;
+          }
+
+          if (!canProceedToPayment) {
+            setError(
+              "Payment address is not available. Cannot proceed to payment."
+            );
+            setLoading(false);
+            console.error(
+              "Cannot proceed: Effective wallet address is missing."
+            );
+            return;
+          }
+
+          // Send incomplete CRM data *before* changing step
+          await sendToCRM("incomplete");
+
+          // Move to step 2
+          setStep(2);
+          setTimeLeft(TIMER_DURATION);
+          setTimerActive(true);
+          // Save state to localStorage when moving step
+          if (typeof window !== "undefined") {
+            localStorage.setItem("paymentTimeLeft", TIMER_DURATION.toString());
+            localStorage.setItem("paymentTimerActive", "true");
+            localStorage.setItem("paymentStep", "2");
+            // formData is already saved by input handlers or the sync effect
+          }
+
+          setLoading(false); // Reset loading after successfully moving step
+          return; // Exit function after step 1 submission
+        }
+
+        // Logic for step 2 submission
+        if (!timerActive) {
+          setError("Payment window expired. Please request more time.");
+          setLoading(false); // Reset loading on timer error
+          return;
+        }
+
+        if (!formData.trxn_hash) {
+          setError("Please enter the transaction hash to confirm payment.");
+          setLoading(false); // Reset loading on validation error
+          return;
+        }
+
+        if (!effectiveWalletAddress) {
+          setError(
+            "Payment address not available. Cannot proceed with payment."
+          );
+          setLoading(false); // Reset loading on logic error
+          console.error(
+            "Payment attempt failed: Effective wallet address is missing."
+          );
+          return;
+        }
+
+        // If we reach here, it's step 2 and validation passed. Proceed with API calls.
+        console.log("Proceeding with payment verification API calls...");
 
         const fullAddress = `${formData.street}, ${formData.city}, ${formData.state}, ${formData.postalCode}, ${formData.country}`;
 
+        // Attempt User Signup (non-blocking for payment flow)
         try {
           await fetch(USER_SIGNUP_URL, {
             method: "POST",
@@ -415,24 +471,26 @@ export default function PaymentForm({
           console.log("Signup request sent.");
         } catch (error) {
           console.error("Signup error:", error);
+          // Don't block payment for signup failure
         }
 
+        // Submit Payment Verification
         console.log("Sending payment data to API...");
         const response = await fetch(PAYMENT_API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            amount: formData.amount,
-            currency: formData.currency,
+            amount: formData.amount, // Use state value
+            currency: formData.currency, // Use state value
             description: description,
-            usd_amount: formData.usd_amount,
+            usd_amount: formData.usd_amount, // Use state value
             first_name: formData.firstName,
             last_name: formData.lastName,
             email: formData.email,
             phone: `${countryCode}${formData.phoneNumber}`,
             address: fullAddress,
             trxn_hash: formData.trxn_hash,
-            signup_consent: true,
+            signup_consent: true, // Assuming consent is implied by submitting form
             wallet_address: effectiveWalletAddress, // Use the effective wallet address
           }),
         });
@@ -450,17 +508,20 @@ export default function PaymentForm({
             responseText,
             error
           );
+          // If parsing fails but status is OK, might still be a success depending on API contract
           if (!(response.status >= 200 && response.status < 300)) {
             throw new Error(
-              "Payment verification failed: Invalid response from server."
+              `Payment verification failed: Invalid response from server. Raw: ${responseText}`
             );
           }
         }
 
         if (response.status >= 200 && response.status < 300) {
           console.log("Payment successful:", result || "No response body");
+          // Send complete CRM data
           await sendToCRM("complete");
 
+          // Clear localStorage on successful completion
           if (typeof window !== "undefined") {
             localStorage.removeItem("paymentStep");
             localStorage.removeItem("paymentFormData");
@@ -473,6 +534,7 @@ export default function PaymentForm({
             }
           }
 
+          // Show success toast and redirect
           const successMessage = document.createElement("div");
           successMessage.className =
             "fixed top-4 right-4 bg-green-50 text-green-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
@@ -481,35 +543,44 @@ export default function PaymentForm({
 
           setTimeout(() => {
             successMessage.classList.add("animate-slide-out");
-            setTimeout(() => successMessage.remove(), 300);
-            if (redirect_url) {
-              window.location.href = redirect_url;
-            } else {
-              console.log("Payment complete, no redirect URL provided.");
-            }
+            setTimeout(() => {
+              successMessage.remove();
+              if (redirect_url) {
+                window.location.href = redirect_url;
+              } else {
+                // If no redirect, maybe show a "Payment Complete" step
+                console.log("Payment complete, no redirect URL provided.");
+                // You might want to set a final step or state here if no redirect
+                // setStep(3); // Example
+              }
+            }, 300);
           }, 3000);
 
-          return;
+          // Do NOT setStep(3) or similar here if redirecting, as it will be interrupted.
+          // If NOT redirecting, uncomment setStep(3) or handle final state.
+        } else {
+          // Handle API errors (non-2xx status codes)
+          console.error("Payment API response error:", response.status, result);
+          const errorMessage =
+            result?.message ||
+            result?.error ||
+            (responseText
+              ? `Payment verification failed: ${responseText}`
+              : `Payment verification failed (Status: ${response.status})`);
+
+          throw new Error(errorMessage); // Throw to be caught by the catch block
         }
-
-        console.error("Payment API response error:", response.status, result);
-        const errorMessage =
-          result?.message ||
-          result?.error ||
-          (responseText
-            ? `Payment verification failed: ${responseText}`
-            : `Payment verification failed (Status: ${response.status})`);
-
-        throw new Error(errorMessage);
       } catch (error: any) {
+        // Handle any errors during submission (validation, API errors, network)
         console.error("Payment submission error:", error);
         const errorMsg =
           error instanceof Error
             ? error.message
             : "Payment verification failed: Unknown error";
 
-        setError(errorMsg);
+        setError(errorMsg); // Set form-level error
 
+        // Show error toast
         const errorToast = document.createElement("div");
         errorToast.className =
           "fixed bottom-4 left-4 bg-red-50 text-red-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in max-w-md";
@@ -521,20 +592,24 @@ export default function PaymentForm({
           setTimeout(() => errorToast.remove(), 300);
         }, 7000);
       } finally {
-        setLoading(false);
+        setLoading(false); // Always reset loading state in finally block
       }
     },
     [
-      step,
-      formData,
-      countryCode,
-      description,
-      redirect_url,
-      sendToCRM,
-      effectiveWalletAddress,
-      timerActive,
-      USER_SIGNUP_URL,
-      PAYMENT_API_URL,
+      step, // Dependency because logic changes based on step
+      formData, // Dependency because form data is submitted
+      countryCode, // Dependency for phone number
+      description, // Dependency for API call
+      redirect_url, // Dependency for redirect logic
+      sendToCRM, // Dependency for CRM call
+      effectiveWalletAddress, // Dependency for payment address check and API call
+      timerActive, // Dependency for timer check
+      USER_SIGNUP_URL, // Dependency for API call
+      PAYMENT_API_URL, // Dependency for API call
+      initialAmount, // Include initial props as dependencies if they influence submission logic (less likely, but safe)
+      initialCurrency,
+      initialUsdAmount,
+      canProceedToPayment, // Include derived state used in logic
     ]
   );
 
@@ -543,13 +618,21 @@ export default function PaymentForm({
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const { name, value } = e.target;
 
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
+      setFormData((prev) => {
+        const newFormData = {
+          ...prev,
+          [name]: value,
+        };
+        // Save to localStorage immediately on user input change
+        if (typeof window !== "undefined") {
+          localStorage.setItem("paymentFormData", JSON.stringify(newFormData));
+        }
+        return newFormData;
+      });
+
       if (error) setError(null);
     },
-    []
+    [error] // Clear error when inputs change
   );
 
   // Memoized function to copy text to clipboard and show toast
@@ -569,7 +652,6 @@ export default function PaymentForm({
     }, 2000);
   }, []);
 
-  // --- Styling Constants (Kept here for now, could be moved to styles/paymentStyles.ts) ---
   const brandPurple = "#4c3f84";
   const baseInputClasses = `w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-[${brandPurple}] focus:border-[${brandPurple}] disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 placeholder-gray-400 text-sm`;
   const baseSelectClasses = `w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-[${brandPurple}] focus:border-[${brandPurple}] text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed text-sm`;
@@ -638,6 +720,7 @@ export default function PaymentForm({
   }
 
   // If we finished loading, but still no effective wallet address
+  // This is a separate error state from store loading failure
   if (!storeLoading && !effectiveWalletAddress) {
     return (
       <div className="max-w-xl w-full mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
@@ -664,6 +747,9 @@ export default function PaymentForm({
   }
 
   // --- Main Form Render (only if !storeLoading AND effectiveWalletAddress is available) ---
+  // Add storeError || !effectiveWalletAddress check here too?
+  // The above checks already handle the cases where we should NOT render the form.
+  // So if we reach here, it's safe to render.
   return (
     <div className="max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8">
       <div
@@ -756,41 +842,41 @@ export default function PaymentForm({
           {step === 1 && (
             <PaymentDetailsStep
               formData={formData}
-              setFormData={setFormData} // Pass setFormData down
-              handleInputChange={handleInputChange}
+              setFormData={setFormData} // Pass setFormData down (handlers should save to localStorage)
+              handleInputChange={handleInputChange} // Updated to save to localStorage
               countryCode={countryCode}
-              setCountryCode={setCountryCode}
-              handleSubmit={handleSubmit}
+              setCountryCode={setCountryCode} // Consider if countryCode needs localStorage save here or only in main effect
+              handleSubmit={handleSubmit} // Updated to set loading state
               loading={loading}
               error={error}
               canProceedToPayment={canProceedToPayment}
               totalAmountDue={totalAmountDue}
               totalUsdAmountDue={totalUsdAmountDue}
               processingFee={processingFee}
-              storeError={storeError}
-              effectiveWalletAddress={effectiveWalletAddress}
+              storeError={storeError} // Pass storeError down for potential display
+              effectiveWalletAddress={effectiveWalletAddress} // Pass effective address down
             />
           )}
 
           {step === 2 && (
             <PaymentCompleteStep
               formData={formData}
-              handleInputChange={handleInputChange}
-              handleSubmit={handleSubmit}
+              handleInputChange={handleInputChange} // Updated to save to localStorage
+              handleSubmit={handleSubmit} // Updated to set loading state
               loading={loading}
               error={error}
-              effectiveWalletAddress={effectiveWalletAddress}
+              effectiveWalletAddress={effectiveWalletAddress} // Pass effective address down
               totalAmountDue={totalAmountDue}
               totalUsdAmountDue={totalUsdAmountDue}
               processingFee={processingFee}
               processingFeeUsd={processingFeeUsd}
               timerActive={timerActive}
               timeLeft={timeLeft}
-              handleMoreTime={handleMoreTime}
+              handleMoreTime={handleMoreTime} // Updated to save state on click
               copyToClipboard={copyToClipboard}
-              handlePasteTransactionHash={handlePasteTransactionHash}
-              resetSession={resetSession}
-              storeError={storeError}
+              handlePasteTransactionHash={handlePasteTransactionHash} // Updated to save to localStorage
+              resetSession={resetSession} // Updated to potentially reset state instead of reload
+              storeError={storeError} // Pass storeError down
             />
           )}
         </div>

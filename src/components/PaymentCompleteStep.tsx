@@ -72,14 +72,6 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
 
       {/* Description and Amount Summary with Fee */}
       <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 mb-6 text-sm space-y-2">
-        <div className="mb-3">
-          <span className="block text-gray-600 text-sm mb-1">Description:</span>
-
-          <span className="block text-gray-900 font-medium text-base break-words">
-            {/* Replace with actual description prop */}
-            (Description Placeholder)
-          </span>
-        </div>
         <div className="flex justify-between">
           <span className="text-gray-600">Original Amount:</span>
           <span className="font-bold text-gray-900">
@@ -306,14 +298,14 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
             ← Back to Details
           </button>
 
-          <button
+          {/* <button
             type="button"
             className="w-full text-gray-600 py-2 text-sm hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={resetSession}
             disabled={loading}
           >
             Start Over
-          </button>
+          </button> */}
         </div>
       </form>
     </div>
