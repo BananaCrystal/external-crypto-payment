@@ -1,6 +1,6 @@
 "use client";
 
-import { CURRENCIES } from "@/constants";
+import { CURRENCIES } from "@/constants/countries";
 import { formatCurrency } from "@/helpers";
 import { useState, useEffect } from "react";
 import { LogoComponent } from "./LogoComponent";
@@ -97,7 +97,7 @@ export default function StoreIntegration() {
     }
 
     const baseUrl = window.location.origin;
-    
+
     // Build URL parameters
     const params = new URLSearchParams({
       store_id: formData.store_id,
@@ -124,10 +124,12 @@ export default function StoreIntegration() {
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
   ) => {
     const { name, value } = e.target;
-    
+
     if (name.startsWith("crm.")) {
       const crmField = name.split(".")[1];
       setFormData({
@@ -153,7 +155,7 @@ export default function StoreIntegration() {
         enabled: e.target.checked,
       },
     });
-    
+
     if (e.target.checked) {
       setShowCrmSettings(true);
     }
@@ -163,7 +165,8 @@ export default function StoreIntegration() {
     "w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-400";
   const baseSelectClasses =
     "w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 bg-white";
-  const tabClasses = "px-4 py-2 font-medium text-sm rounded-lg transition-all duration-200";
+  const tabClasses =
+    "px-4 py-2 font-medium text-sm rounded-lg transition-all duration-200";
   const activeTabClasses = `${tabClasses} bg-purple-800 text-white`;
   const inactiveTabClasses = `${tabClasses} text-gray-600 hover:bg-gray-100`;
 
@@ -177,20 +180,25 @@ export default function StoreIntegration() {
         <div className="flex items-center gap-3">
           <span className="text-2xl">💳</span>
           <p className="text-gray-900">
-            Enter your store details and payment information to generate a custom payment link for your customers.
+            Enter your store details and payment information to generate a
+            custom payment link for your customers.
           </p>
         </div>
       </div>
 
       <div className="flex space-x-2 mb-6">
-        <button 
-          className={activeTab === "payment" ? activeTabClasses : inactiveTabClasses}
+        <button
+          className={
+            activeTab === "payment" ? activeTabClasses : inactiveTabClasses
+          }
           onClick={() => setActiveTab("payment")}
         >
           Payment Settings
         </button>
-        <button 
-          className={activeTab === "integration" ? activeTabClasses : inactiveTabClasses}
+        <button
+          className={
+            activeTab === "integration" ? activeTabClasses : inactiveTabClasses
+          }
           onClick={() => setActiveTab("integration")}
         >
           CRM Integration
@@ -240,8 +248,8 @@ export default function StoreIntegration() {
                 placeholder="0x..."
               />
               <p className="text-sm text-gray-500 mt-1">
-                Your USDT wallet address on the Polygon network where payments will
-                be sent
+                Your USDT wallet address on the Polygon network where payments
+                will be sent
               </p>
             </div>
 
@@ -373,8 +381,9 @@ export default function StoreIntegration() {
                 <div>
                   <p className="text-yellow-800 font-medium">CRM Integration</p>
                   <p className="text-yellow-700 text-sm mt-1">
-                    Connect your CRM system to automatically send customer data before and after payment.
-                    Customer details will be tagged differently for initiated vs. completed payments.
+                    Connect your CRM system to automatically send customer data
+                    before and after payment. Customer details will be tagged
+                    differently for initiated vs. completed payments.
                   </p>
                 </div>
               </div>
@@ -389,7 +398,10 @@ export default function StoreIntegration() {
                 onChange={handleCrmToggle}
                 className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
               />
-              <label htmlFor="crm_enabled" className="ml-2 text-gray-900 font-medium">
+              <label
+                htmlFor="crm_enabled"
+                className="ml-2 text-gray-900 font-medium"
+              >
                 Enable CRM Integration
               </label>
             </div>
@@ -509,8 +521,12 @@ export default function StoreIntegration() {
 
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-blue-800 text-sm">
-                    <span className="font-medium">Data sent to CRM:</span> First name, last name, email, phone, address, payment amount, currency, and status.
-                    The customer will be tagged with {formData.crm.tagIncomplete} when they start the payment process and {formData.crm.tagComplete} when payment is confirmed.
+                    <span className="font-medium">Data sent to CRM:</span> First
+                    name, last name, email, phone, address, payment amount,
+                    currency, and status. The customer will be tagged with{" "}
+                    {formData.crm.tagIncomplete} when they start the payment
+                    process and {formData.crm.tagComplete} when payment is
+                    confirmed.
                   </p>
                 </div>
               </>
@@ -572,10 +588,11 @@ export default function StoreIntegration() {
             <button
               onClick={() => {
                 navigator.clipboard.writeText(generatedLink);
-                
+
                 // Show toast notification
                 const toast = document.createElement("div");
-                toast.className = "fixed top-4 right-4 bg-purple-50 text-purple-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
+                toast.className =
+                  "fixed top-4 right-4 bg-purple-50 text-purple-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
                 toast.innerHTML = `
                   <div class="flex items-center gap-2">
                     <span>📋</span>
@@ -583,7 +600,7 @@ export default function StoreIntegration() {
                   </div>
                 `;
                 document.body.appendChild(toast);
-                
+
                 // Remove toast after 2 seconds
                 setTimeout(() => {
                   toast.classList.add("animate-slide-out");
@@ -592,7 +609,17 @@ export default function StoreIntegration() {
               }}
               className="flex items-center gap-1 text-purple-600 hover:text-purple-800 font-medium bg-white py-2 px-4 rounded border border-purple-200 hover:border-purple-400 transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
@@ -602,11 +629,11 @@ export default function StoreIntegration() {
           <div className="font-mono text-sm break-all text-gray-600 bg-white p-4 rounded-lg border border-gray-200">
             {generatedLink}
           </div>
-          
+
           <div className="mt-4 flex gap-4">
-            <a 
-              href={generatedLink} 
-              target="_blank" 
+            <a
+              href={generatedLink}
+              target="_blank"
               rel="noopener noreferrer"
               className="flex-1 bg-blue-600 text-white text-center py-2 rounded-lg hover:bg-blue-700 transition-colors"
             >
@@ -614,9 +641,13 @@ export default function StoreIntegration() {
             </a>
             <button
               onClick={() => {
-                const testParams = new URLSearchParams(generatedLink.split('?')[1]);
-                const testUrl = `${window.location.origin}/test-payment?${testParams.toString()}`;
-                window.open(testUrl, '_blank');
+                const testParams = new URLSearchParams(
+                  generatedLink.split("?")[1]
+                );
+                const testUrl = `${
+                  window.location.origin
+                }/test-payment?${testParams.toString()}`;
+                window.open(testUrl, "_blank");
               }}
               className="flex-1 bg-gray-700 text-white text-center py-2 rounded-lg hover:bg-gray-800 transition-colors"
             >

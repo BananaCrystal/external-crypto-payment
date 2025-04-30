@@ -1,95 +1,94 @@
 export const COUNTRY_CODES = [
-    // Africa
-    { code: "+213", country: "Algeria" },
-    { code: "+244", country: "Angola" },
-    { code: "+229", country: "Benin" },
-    { code: "+267", country: "Botswana" },
-    { code: "+226", country: "Burkina Faso" },
-    { code: "+257", country: "Burundi" },
-    { code: "+237", country: "Cameroon" },
-    { code: "+238", country: "Cape Verde" },
-    { code: "+236", country: "Central African Republic" },
-    { code: "+235", country: "Chad" },
-    { code: "+269", country: "Comoros" },
-    { code: "+242", country: "Congo" },
-    { code: "+243", country: "Congo (DRC)" },
-    { code: "+253", country: "Djibouti" },
-    { code: "+20", country: "Egypt" },
-    { code: "+240", country: "Equatorial Guinea" },
-    { code: "+291", country: "Eritrea" },
-    { code: "+251", country: "Ethiopia" },
-    { code: "+241", country: "Gabon" },
-    { code: "+220", country: "Gambia" },
-    { code: "+233", country: "Ghana" },
-    { code: "+224", country: "Guinea" },
-    { code: "+245", country: "Guinea-Bissau" },
-    { code: "+225", country: "Ivory Coast" },
-    { code: "+254", country: "Kenya" },
-    { code: "+266", country: "Lesotho" },
-    { code: "+231", country: "Liberia" },
-    { code: "+218", country: "Libya" },
-    { code: "+261", country: "Madagascar" },
-    { code: "+265", country: "Malawi" },
-    { code: "+223", country: "Mali" },
-    { code: "+222", country: "Mauritania" },
-    { code: "+230", country: "Mauritius" },
-    { code: "+212", country: "Morocco" },
-    { code: "+258", country: "Mozambique" },
-    { code: "+264", country: "Namibia" },
-    { code: "+227", country: "Niger" },
-    { code: "+234", country: "Nigeria" },
-    { code: "+250", country: "Rwanda" },
-    { code: "+221", country: "Senegal" },
-    { code: "+232", country: "Sierra Leone" },
-    { code: "+252", country: "Somalia" },
-    { code: "+27", country: "South Africa" },
-    { code: "+211", country: "South Sudan" },
-    { code: "+249", country: "Sudan" },
-    { code: "+268", country: "Eswatini" },
-    { code: "+255", country: "Tanzania" },
-    { code: "+228", country: "Togo" },
-    { code: "+216", country: "Tunisia" },
-    { code: "+256", country: "Uganda" },
-    { code: "+260", country: "Zambia" },
-    { code: "+263", country: "Zimbabwe" },
-    
-    // Americas
-    { code: "+1", country: "United States" },
-    { code: "+1", country: "Canada" },
-    { code: "+54", country: "Argentina" },
-    { code: "+55", country: "Brazil" },
-    { code: "+56", country: "Chile" },
-    { code: "+57", country: "Colombia" },
-    { code: "+52", country: "Mexico" },
-    { code: "+598", country: "Uruguay" },
-    { code: "+58", country: "Venezuela" },
-    
-    // Asia & Pacific
-    { code: "+61", country: "Australia" },
-    { code: "+91", country: "India" },
-    { code: "+62", country: "Indonesia" },
-    { code: "+81", country: "Japan" },
-    { code: "+82", country: "South Korea" },
-    { code: "+63", country: "Philippines" },
-    { code: "+65", country: "Singapore" },
-    { code: "+66", country: "Thailand" },
-    { code: "+84", country: "Vietnam" },
-    
-    // Europe
-    { code: "+44", country: "United Kingdom" },
-    { code: "+33", country: "France" },
-    { code: "+49", country: "Germany" },
-    { code: "+39", country: "Italy" },
-    { code: "+31", country: "Netherlands" },
-    { code: "+34", country: "Spain" },
-    { code: "+46", country: "Sweden" },
-    
-    // Middle East
-    { code: "+972", country: "Israel" },
-    { code: "+966", country: "Saudi Arabia" },
-    { code: "+971", country: "United Arab Emirates" },
-  ];
-  
+  // Africa
+  { code: "+213", country: "Algeria" },
+  { code: "+244", country: "Angola" },
+  { code: "+229", country: "Benin" },
+  { code: "+267", country: "Botswana" },
+  { code: "+226", country: "Burkina Faso" },
+  { code: "+257", country: "Burundi" },
+  { code: "+237", country: "Cameroon" },
+  { code: "+238", country: "Cape Verde" },
+  // { code: "+236", country: "Central African Republic" }, // Removed
+  { code: "+235", country: "Chad" },
+  { code: "+269", country: "Comoros" },
+  // { code: "+242", country: "Congo" }, // Removed
+  // { code: "+243", country: "Congo (DRC)" }, // Removed
+  { code: "+253", country: "Djibouti" },
+  { code: "+20", country: "Egypt" },
+  { code: "+240", country: "Equatorial Guinea" },
+  { code: "+291", country: "Eritrea" },
+  { code: "+251", country: "Ethiopia" },
+  { code: "+241", country: "Gabon" },
+  { code: "+220", country: "Gambia" },
+  { code: "+233", country: "Ghana" },
+  { code: "+224", country: "Guinea" },
+  { code: "+245", country: "Guinea-Bissau" },
+  { code: "+225", country: "Ivory Coast" },
+  { code: "+254", country: "Kenya" },
+  { code: "+266", country: "Lesotho" },
+  { code: "+231", country: "Liberia" },
+  { code: "+218", country: "Libya" },
+  { code: "+261", country: "Madagascar" },
+  { code: "+265", country: "Malawi" },
+  { code: "+223", country: "Mali" },
+  { code: "+222", country: "Mauritania" },
+  { code: "+230", country: "Mauritius" },
+  { code: "+212", country: "Morocco" },
+  { code: "+258", country: "Mozambique" },
+  { code: "+264", country: "Namibia" },
+  { code: "+227", country: "Niger" },
+  { code: "+234", country: "Nigeria" },
+  { code: "+250", country: "Rwanda" },
+  { code: "+221", country: "Senegal" },
+  { code: "+232", country: "Sierra Leone" },
+  { code: "+252", country: "Somalia" },
+  { code: "+27", country: "South Africa" },
+  // { code: "+211", country: "South Sudan" }, // Removed
+  // { code: "+249", country: "Sudan" }, // Removed
+  { code: "+268", country: "Eswatini" },
+  { code: "+255", country: "Tanzania" },
+  { code: "+228", country: "Togo" },
+  { code: "+216", country: "Tunisia" },
+  { code: "+256", country: "Uganda" },
+  { code: "+260", country: "Zambia" },
+  // { code: "+263", country: "Zimbabwe" }, // Removed
+
+  // Americas
+  { code: "+1", country: "United States" },
+  { code: "+1", country: "Canada" },
+  { code: "+54", country: "Argentina" },
+  { code: "+55", country: "Brazil" },
+  { code: "+56", country: "Chile" },
+  { code: "+57", country: "Colombia" },
+  { code: "+52", country: "Mexico" },
+  { code: "+598", country: "Uruguay" },
+  // { code: "+58", country: "Venezuela" }, // Removed
+
+  // Asia & Pacific
+  { code: "+61", country: "Australia" },
+  { code: "+91", country: "India" },
+  { code: "+62", country: "Indonesia" },
+  { code: "+81", country: "Japan" },
+  { code: "+82", country: "South Korea" },
+  { code: "+63", country: "Philippines" },
+  { code: "+65", country: "Singapore" },
+  { code: "+66", country: "Thailand" },
+  { code: "+84", country: "Vietnam" },
+
+  // Europe
+  { code: "+44", country: "United Kingdom" },
+  { code: "+33", country: "France" },
+  { code: "+49", country: "Germany" },
+  { code: "+39", country: "Italy" },
+  { code: "+31", country: "Netherlands" },
+  { code: "+34", country: "Spain" },
+  { code: "+46", country: "Sweden" },
+
+  // Middle East
+  { code: "+972", country: "Israel" },
+  { code: "+966", country: "Saudi Arabia" },
+  { code: "+971", country: "United Arab Emirates" },
+];
 
 export const CURRENCIES = [
   // North America
@@ -118,7 +117,7 @@ export const CURRENCIES = [
   { code: "PEN", name: "Peruvian Sol" },
   { code: "UYU", name: "Uruguayan Peso" },
   { code: "PYG", name: "Paraguayan Guaraní" },
-  { code: "VES", name: "Venezuelan Bolívar Soberano" },
+  // { code: "VES", name: "Venezuelan Bolívar Soberano" }, // Removed
   { code: "GYD", name: "Guyanese Dollar" },
   { code: "SRD", name: "Surinamese Dollar" },
 
@@ -141,7 +140,7 @@ export const CURRENCIES = [
   { code: "BAM", name: "Bosnia and Herzegovina Convertible Mark" },
   { code: "RSD", name: "Serbian Dinar" },
   { code: "MDL", name: "Moldovan Leu" },
-  { code: "UAH", name: "Ukrainian Hryvnia" },
+  // { code: "UAH", name: "Ukrainian Hryvnia" }, // Removed
 
   // Africa
   { code: "NGN", name: "Nigerian Naira" },
@@ -156,7 +155,7 @@ export const CURRENCIES = [
   { code: "MAD", name: "Moroccan Dirham" },
   { code: "TND", name: "Tunisian Dinar" },
   { code: "XOF", name: "West African CFA Franc" },
-  { code: "XAF", name: "Central African CFA Franc" },
+  { code: "XAF", name: "Central African CFA Franc" }, // Note: Used by multiple countries including some not removed.
   { code: "MUR", name: "Mauritian Rupee" },
   { code: "NAD", name: "Namibian Dollar" },
   { code: "BWP", name: "Botswanan Pula" },
@@ -169,9 +168,9 @@ export const CURRENCIES = [
   { code: "SLL", name: "Sierra Leonean Leone" },
   { code: "LRD", name: "Liberian Dollar" },
   { code: "GNF", name: "Guinean Franc" },
-  { code: "CDF", name: "Congolese Franc" },
-  { code: "SDG", name: "Sudanese Pound" },
-  { code: "SSP", name: "South Sudanese Pound" },
+  // { code: "CDF", name: "Congolese Franc" }, // Removed
+  // { code: "SDG", name: "Sudanese Pound" }, // Removed
+  // { code: "SSP", name: "South Sudanese Pound" }, // Removed
   { code: "DJF", name: "Djiboutian Franc" },
   { code: "SOS", name: "Somali Shilling" },
 
@@ -189,7 +188,7 @@ export const CURRENCIES = [
   { code: "VND", name: "Vietnamese Đồng" },
   { code: "KHR", name: "Cambodian Riel" },
   { code: "LAK", name: "Lao Kip" },
-  { code: "MMK", name: "Myanmar Kyat" },
+  // { code: "MMK", name: "Myanmar Kyat" }, // Removed
   { code: "BDT", name: "Bangladeshi Taka" },
   { code: "NPR", name: "Nepalese Rupee" },
   { code: "LKR", name: "Sri Lankan Rupee" },
@@ -211,7 +210,7 @@ export const CURRENCIES = [
   { code: "KWD", name: "Kuwaiti Dinar" },
   { code: "JOD", name: "Jordanian Dinar" },
   { code: "LBP", name: "Lebanese Pound" },
-  { code: "IQD", name: "Iraqi Dinar" },
+  // { code: "IQD", name: "Iraqi Dinar" }, // Removed
   { code: "YER", name: "Yemeni Rial" },
   { code: "ILS", name: "Israeli New Shekel" },
 
@@ -226,3 +225,5 @@ export const CURRENCIES = [
   { code: "XPF", name: "CFP Franc" },
   { code: "PGK", name: "Papua New Guinean Kina" },
 ];
+
+
