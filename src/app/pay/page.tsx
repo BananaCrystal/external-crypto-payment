@@ -99,7 +99,7 @@ export default function PaymentPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-purple-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <PaymentForm
           storeId={params.store_id!}
           amount={parseFloat(params.amount!)}

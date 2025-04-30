@@ -1,18 +1,26 @@
-// LogoComponent.tsx
 "use client";
 
 interface LogoComponentProps {
-  size?: 'small' | 'medium' | 'large';
+  size?: "small" | "medium" | "large";
   showText?: boolean;
+  color?: string;
 }
 
-export function LogoComponent({ size = 'medium', showText = true }: LogoComponentProps) {
+export function LogoComponent({
+  size = "medium",
+  showText = true,
+  color,
+}: LogoComponentProps) {
   const logoSizes = {
     small: "h-4 w-4",
     medium: "h-6 w-6",
-    large: "h-8 w-8"
+    large: "h-8 w-8",
   };
-  
+
+  const textColorClass = color ? "" : "text-gray-700";
+
+  const textStyle = color ? { color: `#${color}` } : {};
+
   return (
     <div className="flex items-center">
       <img
@@ -20,7 +28,11 @@ export function LogoComponent({ size = 'medium', showText = true }: LogoComponen
         alt="BananaCrystal"
         className={`${logoSizes[size]} mr-1`}
       />
-      {showText && <span className="text-gray-700 font-medium">BananaCrystal</span>}
+      {showText && (
+        <span className={`${textColorClass} font-medium`} style={textStyle}>
+          BananaCrystal
+        </span>
+      )}
     </div>
   );
 }
