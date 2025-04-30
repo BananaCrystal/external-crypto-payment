@@ -1,4 +1,3 @@
-// app/components/PaymentForm.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -6,14 +5,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 // Import types from new file
 import { PaymentFormProps, StoreDetails, FormData } from "@/types/paymentTypes";
 
-// Import helpers from new file, including formatCurrency
-import {
-  safeJsonParse,
-  formatTime,
-  formatCurrency,
-} from "@/helpers/paymentHelpers";
-// REMOVE the old import for formatCurrency if it existed here:
-// import { formatCurrency } from "@/helpers";
+import { safeJsonParse } from "@/helpers/paymentHelpers";
 
 // Import constants from new file
 import {
@@ -37,13 +29,12 @@ export default function PaymentForm({
   description,
   usd_amount: initialUsdAmount,
   redirect_url,
-  walletAddressFromParams, 
-  crmDetails, 
+  walletAddressFromParams,
+  crmDetails,
 }: PaymentFormProps) {
   // Construct full API URLs
   const STORE_API_URL = `${STORE_API_BASE_URL}/stores/${storeId}`;
   const PAYMENT_API_URL = `${PAYMENT_API_BASE_URL}/stores/${storeId}/external_store_payments`;
-  // USER_SIGNUP_URL and CRM_INTEGRATION_URL are already full paths in constants
 
   // State for the current step (1: Details, 2: Payment)
   const [step, setStep] = useState(() => {
@@ -54,8 +45,6 @@ export default function PaymentForm({
     return 1;
   });
 
-  // State for form data (user input), initialized from localStorage or defaults
-  // formData no longer includes wallet_address
   const [formData, setFormData] = useState<Omit<FormData, "wallet_address">>(
     () => {
       const savedFormData = safeJsonParse("paymentFormData");

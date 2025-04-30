@@ -7,7 +7,6 @@ import {
   baseButtonClasses,
   secondaryButtonClasses,
 } from "@/styles/paymentStyles";
-import { PROCESSING_FEE_PERCENTAGE } from "@/constants/paymentConstants"; // Import fee constant
 
 interface PaymentCompleteStepProps {
   formData: Omit<FormData, "wallet_address">;
@@ -102,9 +101,7 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
       </div>
 
       {/* USDT Amount to Pay - Shows total including fee */}
-      <div
-        className={`bg-[${brandPurple}] rounded-lg p-4 sm:p-6 mb-6 text-white`}
-      >
+      <div className={`bg-[#4c3f84] rounded-lg p-4 sm:p-6 mb-6 text-white`}>
         <div className="text-center">
           <div className="font-medium mb-2 text-purple-200">
             Total USDT Amount to Pay
@@ -126,7 +123,7 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
             <button
               type="button"
               onClick={() => copyToClipboard(effectiveWalletAddress)}
-              className={`bg-[${brandPurple}] hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-semibold flex items-center transition`}
+              className={`bg-[#4c3f84] hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-semibold flex items-center transition`}
               disabled={!effectiveWalletAddress || loading}
             >
               <svg
