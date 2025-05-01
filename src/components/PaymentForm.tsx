@@ -1,796 +1,886 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { PaymentDetails } from "@/types";
-import { COUNTRY_CODES } from "@/constants";
-import { formatCurrency } from "@/helpers";
-import { LogoComponent } from "./LogoComponent";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
-interface PaymentFormProps {
-  storeId: string;
-  amount: number;
-  currency: string;
-  description: string;
-  usd_amount: number;
-  wallet_address: string;
-  redirect_url?: string;
-  crmDetails?: {
-    provider: string;
-    apiKey: string;
-    listId: string;
-    tag: string;
-  };
-}
+import { PaymentFormProps, StoreDetails, FormData } from "@/types/paymentTypes";
+
+import { safeJsonParse } from "@/helpers/paymentHelpers";
+
+import {
+  PROCESSING_FEE_PERCENTAGE,
+  TIMER_DURATION,
+  STORE_API_BASE_URL,
+  PAYMENT_API_BASE_URL,
+  USER_SIGNUP_URL,
+  CRM_INTEGRATION_URL,
+} from "@/constants/paymentConstants";
+import { COUNTRY_CODES } from "@/constants/countries";
+
+import { BananaCrystalFooter } from "./BananaCrystalFooter";
+import { PaymentDetailsStep } from "./PaymentDetailsStep";
+import { PaymentCompleteStep } from "./PaymentCompleteStep";
 
 export default function PaymentForm({
   storeId,
-  amount,
+  amount: initialAmount,
   currency: initialCurrency,
   description,
   usd_amount: initialUsdAmount,
-  wallet_address,
   redirect_url,
+  walletAddressFromParams,
   crmDetails,
 }: PaymentFormProps) {
-  // Initialize state with localStorage values if they exist
+  const STORE_API_URL = `${STORE_API_BASE_URL}/stores/${storeId}`;
+  const PAYMENT_API_URL = `${PAYMENT_API_BASE_URL}/stores/${storeId}/external_store_payments`;
+
   const [step, setStep] = useState(() => {
     if (typeof window !== "undefined") {
       const savedStep = localStorage.getItem("paymentStep");
+
       return savedStep ? parseInt(savedStep) : 1;
     }
     return 1;
   });
 
-  const [formData, setFormData] = useState(() => {
-    if (typeof window !== "undefined") {
-      const savedFormData = localStorage.getItem("paymentFormData");
-      if (savedFormData) {
-        return JSON.parse(savedFormData);
-      }
+  const [formData, setFormData] = useState<Omit<FormData, "wallet_address">>(
+    () => {
+      const savedFormData = safeJsonParse("paymentFormData");
+
+      return {
+        firstName: savedFormData?.firstName || "",
+        lastName: savedFormData?.lastName || "",
+        email: savedFormData?.email || "",
+        phoneNumber: savedFormData?.phoneNumber || "",
+        street: savedFormData?.street || "",
+        city: savedFormData?.city || "",
+        state: savedFormData?.state || "",
+        postalCode: savedFormData?.postalCode || "",
+        country: savedFormData?.country || "",
+        currency: savedFormData?.currency || initialCurrency,
+        amount: savedFormData?.amount || initialAmount,
+        usd_amount: savedFormData?.usd_amount || initialUsdAmount,
+        trxn_hash: savedFormData?.trxn_hash || "",
+      };
     }
-    return {
-      firstName: "",
-      lastName: "",
-      email: "",
-      phoneNumber: "",
-      street: "",
-      city: "",
-      state: "",
-      postalCode: "",
-      country: "Nigeria",
-      signUpConsent: true,
-      currency: initialCurrency,
-      amount: amount,
-      usd_amount: initialUsdAmount,
-      fees: amount * 0.02, // 2% fee
-      wallet_address: wallet_address,
-      trxn_hash: "",
-    };
-  });
+  );
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
+  // State for phone number country code
   const [countryCode, setCountryCode] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("paymentCountryCode") || "+234";
+      // Keep the saved country code for persistence
+      return (
+        localStorage.getItem("paymentCountryCode") ||
+        COUNTRY_CODES[0]?.code ||
+        ""
+      );
     }
-    return "+234";
+    return COUNTRY_CODES[0]?.code || "";
   });
 
-  // Save step to localStorage whenever it changes
+  // State for store details fetched from API
+  const [storeDetails, setStoreDetails] = useState<StoreDetails | null>(null);
+  const [storeLoading, setStoreLoading] = useState(true);
+  // storeError indicates if the API fetch itself failed
+  const [storeError, setStoreError] = useState<string | null>(null);
+
+  // State for payment submission loading and form-specific errors
+  const [loading, setLoading] = useState(false);
+  // error indicates form validation errors or payment submission errors
+  const [error, setError] = useState<string | null>(null);
+
+  // --- Timer State ---
+  const [timeLeft, setTimeLeft] = useState(() => {
+    if (typeof window !== "undefined" && step === 2) {
+      const savedTime = localStorage.getItem("paymentTimeLeft");
+      const savedStep = localStorage.getItem("paymentStep");
+      if (savedStep === "2" && savedTime !== null) {
+        const time = parseInt(savedTime, 10);
+        return time > 0 ? time : 0;
+      }
+    }
+    return TIMER_DURATION;
+  });
+
+  const [timerActive, setTimerActive] = useState(() => {
+    if (typeof window !== "undefined" && step === 2) {
+      const savedTime = localStorage.getItem("paymentTimeLeft");
+      const savedStep = localStorage.getItem("paymentStep");
+      if (savedStep === "2" && savedTime !== null) {
+        return parseInt(savedTime, 10) > 0;
+      }
+    }
+    return false;
+  });
+
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // effectiveWalletAddress correctly prioritizes storeDetails over walletAddressFromParams, and updates automatically
+  const effectiveWalletAddress = useMemo(
+    () => storeDetails?.wallet_address || walletAddressFromParams,
+    [storeDetails, walletAddressFromParams]
+  );
+
+  const canProceedToPayment = useMemo(
+    () => !!effectiveWalletAddress,
+    [effectiveWalletAddress]
+  );
+
+  // Calculate amounts including the processing fee
+  const processingFee = useMemo(
+    () => formData.amount * PROCESSING_FEE_PERCENTAGE,
+    [formData.amount]
+  );
+  const totalAmountDue = useMemo(
+    () => formData.amount + processingFee,
+    [formData.amount, processingFee]
+  );
+  const processingFeeUsd = useMemo(
+    () => formData.usd_amount * PROCESSING_FEE_PERCENTAGE,
+    [formData.usd_amount]
+  );
+  const totalUsdAmountDue = useMemo(
+    () => formData.usd_amount + processingFeeUsd,
+    [formData.usd_amount, processingFeeUsd]
+  );
+
+  // Effect to fetch store details
+  useEffect(() => {
+    const fetchStoreDetails = async () => {
+      setStoreLoading(true);
+      setStoreError(null);
+      try {
+        if (!storeId) {
+          setStoreError("Store ID is missing. Cannot load store details.");
+          setStoreLoading(false);
+          return;
+        }
+
+        const response = await fetch(STORE_API_URL);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.message || `HTTP error! status: ${response.status}`
+          );
+        }
+        const data: StoreDetails = await response.json();
+        setStoreDetails(data);
+      } catch (error: any) {
+        console.error("Failed to fetch store details:", error);
+        setStoreError(
+          "Could not load store information. Please try again later."
+        );
+        setStoreDetails(null);
+      } finally {
+        setStoreLoading(false);
+      }
+    };
+
+    fetchStoreDetails();
+  }, [storeId, STORE_API_URL]);
+
+  useEffect(() => {
+    // Check if the current formData state values differ from the initial props
+    const amountChanged =
+      initialAmount !== undefined && formData.amount !== initialAmount;
+    const currencyChanged =
+      initialCurrency !== undefined && formData.currency !== initialCurrency;
+    const usdAmountChanged =
+      initialUsdAmount !== undefined &&
+      formData.usd_amount !== initialUsdAmount;
+
+    if (amountChanged || currencyChanged || usdAmountChanged) {
+      console.log(
+        "Detected change in initial props. Updating state and localStorage."
+      );
+      setFormData((prevFormData) => {
+        const newFormData = {
+          ...prevFormData,
+
+          amount: amountChanged ? initialAmount : prevFormData.amount,
+          currency: currencyChanged ? initialCurrency : prevFormData.currency,
+          usd_amount: usdAmountChanged
+            ? initialUsdAmount
+            : prevFormData.usd_amount,
+        };
+
+        if (typeof window !== "undefined") {
+          localStorage.setItem("paymentFormData", JSON.stringify(newFormData));
+        }
+
+        return newFormData;
+      });
+    }
+  }, [initialAmount, initialCurrency, initialUsdAmount]);
+
+  // --- Timer Effect ---
+  useEffect(() => {
+    if (step === 2 && timerActive) {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      timerIntervalRef.current = setInterval(() => {
+        setTimeLeft((prevTime) => {
+          const newTime = prevTime - 1;
+          if (newTime <= 0) {
+            clearInterval(timerIntervalRef.current!);
+            timerIntervalRef.current = null;
+            setTimerActive(false);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("paymentTimerActive", "false");
+              localStorage.setItem("paymentTimeLeft", "0");
+            }
+            setError("Payment window expired. Please request more time.");
+            return 0;
+          }
+          return newTime;
+        });
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
+  }, [step, timerActive]);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("paymentStep", step.toString());
-    }
-  }, [step]);
 
-  // Save form data to localStorage whenever it changes
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("paymentFormData", JSON.stringify(formData));
-    }
-  }, [formData]);
-
-  // Save country code to localStorage whenever it changes
-  useEffect(() => {
-    if (typeof window !== "undefined") {
       localStorage.setItem("paymentCountryCode", countryCode);
+      if (step === 2 || timerActive) {
+        localStorage.setItem("paymentTimeLeft", timeLeft.toString());
+        localStorage.setItem("paymentTimerActive", timerActive.toString());
+      } else {
+        localStorage.removeItem("paymentTimeLeft");
+        localStorage.removeItem("paymentTimerActive");
+      }
     }
-  }, [countryCode]);
+  }, [step, countryCode, timeLeft, timerActive]); // Removed formData from dependencies
 
-  const resetSession = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("paymentStep");
-      localStorage.removeItem("paymentFormData");
-      localStorage.removeItem("paymentCountryCode");
-      window.location.reload();
-    }
-  };
+  // Function to reset the payment session
+  const resetSession = useCallback(() => {
+    setStep(1);
+  }, []);
 
   // Function to send data to CRM
-  const sendToCRM = async (status: "incomplete" | "complete") => {
-    if (!crmDetails) return;
+  const sendToCRM = useCallback(
+    async (status: "incomplete" | "complete") => {
+      // ... (CRM logic remains the same)
+      if (!crmDetails || !crmDetails.enabled) return;
 
-    try {
-      // Construct full address from components
-      const fullAddress = `${formData.street}, ${formData.city}, ${formData.state}, ${formData.postalCode}, ${formData.country}`;
-
-      const crmData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: `${countryCode}${formData.phoneNumber}`,
-        address: fullAddress,
-        amount: formData.amount,
-        currency: formData.currency,
-        status: status,
-        paymentDate: status === "complete" ? new Date().toISOString() : null,
-        transactionHash: status === "complete" ? formData.trxn_hash : null,
-      };
-
-      // Generic CRM integration endpoint (frontend proxy)
-      await fetch("/api/crm-integration", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          provider: crmDetails.provider,
-          apiKey: crmDetails.apiKey,
-          listId: crmDetails.listId,
-          tag:
-            status === "complete" ? "payment_completed" : "payment_initiated",
-          userData: crmData,
-        }),
-      });
-
-      console.log(
-        `Data sent to ${crmDetails.provider} CRM with status: ${status}`
-      );
-    } catch (error) {
-      console.error("Failed to send data to CRM:", error);
-      // Non-blocking error - continue with payment flow
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (step === 1) {
-      if (!formData.signUpConsent) {
-        setError("Please accept the terms of service to continue");
-        return;
-      }
-
-      // Send incomplete data to CRM when proceeding to payment step
-      await sendToCRM("incomplete");
-      setStep(2);
-      return;
-    }
-
-    // Validate all required fields
-    if (
-      !formData.firstName ||
-      !formData.lastName ||
-      !formData.email ||
-      !formData.phoneNumber ||
-      !formData.street ||
-      !formData.city ||
-      !formData.trxn_hash
-    ) {
-      setError("Please fill in all required fields");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Construct full address from components
-      const fullAddress = `${formData.street}, ${formData.city}, ${formData.state}, ${formData.postalCode}, ${formData.country}`;
-
-      // Sign up user
       try {
-        await fetch("https://app.bananacrystal.com/api/users/sign_up", {
+        const fullAddress = `${formData.street}, ${formData.city}, ${formData.state}, ${formData.postalCode}, ${formData.country}`;
+
+        const crmData = {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: `${countryCode}${formData.phoneNumber}`,
+          address: fullAddress,
+          amount: formData.amount, // Use state value
+          currency: formData.currency, // Use state value
+          status: status,
+          paymentDate: status === "complete" ? new Date().toISOString() : null,
+          transactionHash: status === "complete" ? formData.trxn_hash : null,
+          storeId: storeId,
+          storeName: storeDetails?.name || "Unknown Store",
+          usdAmount: formData.usd_amount, // Use state value
+          description: description,
+          processingFee: processingFee,
+          totalAmountDue: totalAmountDue,
+          totalUsdAmountDue: totalUsdAmountDue,
+        };
+
+        const tagToSend =
+          status === "complete"
+            ? crmDetails.tagComplete
+            : crmDetails.tagIncomplete;
+
+        await fetch(CRM_INTEGRATION_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            email: formData.email,
-            phone: `${countryCode}${formData.phoneNumber}`,
-            address: fullAddress,
+            provider: crmDetails.provider,
+            apiKey: crmDetails.apiKey,
+            listId: crmDetails.listId,
+            tag: tagToSend,
+            userData: crmData,
           }),
         });
-      } catch (error) {
-        // Continue even if signup fails
-        console.error("Signup error:", error);
-      }
 
-      // Send payment data to BananaCrystal API
-      const response = await fetch(
-        `https://app.bananacrystal.com/api/v1/stores/${storeId}/external_store_payments`,
-        {
+        console.log(
+          `Data sent to ${crmDetails.provider} CRM with status: ${status}`
+        );
+      } catch (error) {
+        console.error("Failed to send data to CRM:", error);
+      }
+    },
+
+    [
+      crmDetails,
+      formData,
+      countryCode,
+      storeId,
+      storeDetails?.name,
+      description,
+      processingFee,
+      totalAmountDue,
+      totalUsdAmountDue,
+      CRM_INTEGRATION_URL,
+    ]
+  );
+
+  const handleMoreTime = useCallback(() => {
+    setTimeLeft(TIMER_DURATION);
+    setTimerActive(true);
+    setError(null);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("paymentTimeLeft", TIMER_DURATION.toString());
+      localStorage.setItem("paymentTimerActive", "true");
+      localStorage.setItem("paymentStep", "2");
+    }
+  }, []);
+
+  const handlePasteTransactionHash = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.clipboard) {
+      console.warn("Clipboard API not available.");
+      return;
+    }
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setFormData((prev) => {
+          const newFormData = { ...prev, trxn_hash: text };
+          // Save to localStorage immediately on user input change
+          if (typeof window !== "undefined") {
+            localStorage.setItem(
+              "paymentFormData",
+              JSON.stringify(newFormData)
+            );
+          }
+          return newFormData;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to paste from clipboard:", err);
+    }
+  }, []);
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError(null);
+      setLoading(true);
+
+      try {
+        if (step === 1) {
+          if (
+            !formData.firstName ||
+            !formData.lastName ||
+            !formData.email ||
+            !formData.phoneNumber ||
+            !formData.street ||
+            !formData.city ||
+            !formData.country
+          ) {
+            setError("Please fill in all required contact and address fields.");
+            setLoading(false);
+            return;
+          }
+
+          if (!canProceedToPayment) {
+            setError(
+              "Payment address is not available. Cannot proceed to payment."
+            );
+            setLoading(false);
+            console.error(
+              "Cannot proceed: Effective wallet address is missing."
+            );
+            return;
+          }
+
+          // Send incomplete CRM data *before* changing step
+          await sendToCRM("incomplete");
+
+          // Move to step 2
+          setStep(2);
+          setTimeLeft(TIMER_DURATION);
+          setTimerActive(true);
+          // Save state to localStorage when moving step
+          if (typeof window !== "undefined") {
+            localStorage.setItem("paymentTimeLeft", TIMER_DURATION.toString());
+            localStorage.setItem("paymentTimerActive", "true");
+            localStorage.setItem("paymentStep", "2");
+            // formData is already saved by input handlers or the sync effect
+          }
+
+          setLoading(false); // Reset loading after successfully moving step
+          return; // Exit function after step 1 submission
+        }
+
+        // Logic for step 2 submission
+        if (!timerActive) {
+          setError("Payment window expired. Please request more time.");
+          setLoading(false); // Reset loading on timer error
+          return;
+        }
+
+        if (!formData.trxn_hash) {
+          setError("Please enter the transaction hash to confirm payment.");
+          setLoading(false); // Reset loading on validation error
+          return;
+        }
+
+        if (!effectiveWalletAddress) {
+          setError(
+            "Payment address not available. Cannot proceed with payment."
+          );
+          setLoading(false); // Reset loading on logic error
+          console.error(
+            "Payment attempt failed: Effective wallet address is missing."
+          );
+          return;
+        }
+
+        // If we reach here, it's step 2 and validation passed. Proceed with API calls.
+        console.log("Proceeding with payment verification API calls...");
+
+        const fullAddress = `${formData.street}, ${formData.city}, ${formData.state}, ${formData.postalCode}, ${formData.country}`;
+
+        // Attempt User Signup (non-blocking for payment flow)
+        try {
+          await fetch(USER_SIGNUP_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              email: formData.email,
+              phone: `${countryCode}${formData.phoneNumber}`,
+              address: fullAddress,
+            }),
+          });
+          console.log("Signup request sent.");
+        } catch (error) {
+          console.error("Signup error:", error);
+          // Don't block payment for signup failure
+        }
+
+        // Submit Payment Verification
+        console.log("Sending payment data to API...");
+        const response = await fetch(PAYMENT_API_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            amount: formData.amount,
-            currency: formData.currency,
+            amount: formData.amount, // Use state value
+            currency: formData.currency, // Use state value
             description: description,
-            usd_amount: formData.usd_amount,
+            usd_amount: formData.usd_amount, // Use state value
             first_name: formData.firstName,
             last_name: formData.lastName,
             email: formData.email,
             phone: `${countryCode}${formData.phoneNumber}`,
             address: fullAddress,
             trxn_hash: formData.trxn_hash,
-            signup_consent: formData.signUpConsent,
-            wallet_address: formData.wallet_address,
+            signup_consent: true, // Assuming consent is implied by submitting form
+            wallet_address: effectiveWalletAddress, // Use the effective wallet address
           }),
-        }
-      );
+        });
 
-      // Improved response handling
-      let result;
-      try {
-        result = await response.json();
-      } catch (error) {
-        console.warn("Failed to parse JSON response", error);
-        result = null; // If parsing fails, assume empty response
-      }
-
-      // Check for success: either response.status === 201 or response is empty (no status)
-      if (!response.status || response.status === 201) {
-        console.log("Payment successful:", result || "No response body");
-
-        // Send completed data to CRM after successful payment
-        await sendToCRM("complete");
-
-        // Clear localStorage on successful payment
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("paymentStep");
-          localStorage.removeItem("paymentFormData");
-          localStorage.removeItem("paymentCountryCode");
-        }
-
-        // Show success message
-        const successMessage = document.createElement("div");
-        successMessage.className =
-          "fixed top-4 right-4 bg-green-50 text-green-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
-        successMessage.innerHTML = `
-          <div class="flex items-center gap-2">
-            <span>✅</span>
-            <p>Payment verified successfully!</p>
-          </div>
-        `;
-        document.body.appendChild(successMessage);
-
-        // Remove success message after 3 seconds
-        setTimeout(() => {
-          successMessage.classList.add("animate-slide-out");
-          setTimeout(() => successMessage.remove(), 300);
-
-          // Redirect after showing success message
-          if (redirect_url) {
-            window.location.href = redirect_url;
+        let result = null;
+        let responseText = null;
+        try {
+          responseText = await response.text();
+          if (responseText && responseText.trim().length > 0) {
+            result = JSON.parse(responseText);
           }
-        }, 3000);
+        } catch (error) {
+          console.warn(
+            "Failed to parse JSON response, raw text:",
+            responseText,
+            error
+          );
+          // If parsing fails but status is OK, might still be a success depending on API contract
+          if (!(response.status >= 200 && response.status < 300)) {
+            throw new Error(
+              `Payment verification failed: Invalid response from server. Raw: ${responseText}`
+            );
+          }
+        }
 
-        return; // Stop further execution
+        if (response.status >= 200 && response.status < 300) {
+          console.log("Payment successful:", result || "No response body");
+          // Send complete CRM data
+          await sendToCRM("complete");
+
+          // Clear localStorage on successful completion
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("paymentStep");
+            localStorage.removeItem("paymentFormData");
+            localStorage.removeItem("paymentCountryCode");
+            localStorage.removeItem("paymentTimeLeft");
+            localStorage.removeItem("paymentTimerActive");
+            if (timerIntervalRef.current) {
+              clearInterval(timerIntervalRef.current);
+              timerIntervalRef.current = null;
+            }
+          }
+
+          // Show success toast and redirect
+          const successMessage = document.createElement("div");
+          successMessage.className =
+            "fixed top-4 right-4 bg-green-50 text-green-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
+          successMessage.innerHTML = `<div class="flex items-center gap-2"><span>✅</span><p>Payment verified successfully!</p></div>`;
+          document.body.appendChild(successMessage);
+
+          setTimeout(() => {
+            successMessage.classList.add("animate-slide-out");
+            setTimeout(() => {
+              successMessage.remove();
+              if (redirect_url) {
+                window.location.href = redirect_url;
+              } else {
+                // If no redirect, maybe show a "Payment Complete" step
+                console.log("Payment complete, no redirect URL provided.");
+                // You might want to set a final step or state here if no redirect
+                // setStep(3); // Example
+              }
+            }, 300);
+          }, 3000);
+
+          // Do NOT setStep(3) or similar here if redirecting, as it will be interrupted.
+          // If NOT redirecting, uncomment setStep(3) or handle final state.
+        } else {
+          // Handle API errors (non-2xx status codes)
+          console.error("Payment API response error:", response.status, result);
+          const errorMessage =
+            result?.message ||
+            result?.error ||
+            (responseText
+              ? `Payment verification failed: ${responseText}`
+              : `Payment verification failed (Status: ${response.status})`);
+
+          throw new Error(errorMessage); // Throw to be caught by the catch block
+        }
+      } catch (error: any) {
+        // Handle any errors during submission (validation, API errors, network)
+        console.error("Payment submission error:", error);
+        const errorMsg =
+          error instanceof Error
+            ? error.message
+            : "Payment verification failed: Unknown error";
+
+        setError(errorMsg); // Set form-level error
+
+        // Show error toast
+        const errorToast = document.createElement("div");
+        errorToast.className =
+          "fixed bottom-4 left-4 bg-red-50 text-red-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in max-w-md";
+        errorToast.innerHTML = `<div class="flex items-start space-x-3"> <span class="text-xl flex-shrink-0">❌</span> <div> <p class="font-semibold">Payment Error</p> <p class="text-sm break-words">${errorMsg}</p> </div></div>`;
+        document.body.appendChild(errorToast);
+
+        setTimeout(() => {
+          errorToast.classList.add("animate-slide-out");
+          setTimeout(() => errorToast.remove(), 300);
+        }, 7000);
+      } finally {
+        setLoading(false); // Always reset loading state in finally block
       }
+    },
+    [
+      step, // Dependency because logic changes based on step
+      formData, // Dependency because form data is submitted
+      countryCode, // Dependency for phone number
+      description, // Dependency for API call
+      redirect_url, // Dependency for redirect logic
+      sendToCRM, // Dependency for CRM call
+      effectiveWalletAddress, // Dependency for payment address check and API call
+      timerActive, // Dependency for timer check
+      USER_SIGNUP_URL, // Dependency for API call
+      PAYMENT_API_URL, // Dependency for API call
+      initialAmount, // Include initial props as dependencies if they influence submission logic (less likely, but safe)
+      initialCurrency,
+      initialUsdAmount,
+      canProceedToPayment, // Include derived state used in logic
+    ]
+  );
 
-      // Handle failure cases
-      console.log("Full API response:", result);
-      const errorMessage =
-        result?.message || result?.error || "Unknown error occurred";
-      throw new Error(errorMessage);
-    } catch (error) {
-      // More detailed error handling
-      console.error("Payment error (full):", error);
+  // Handle input changes and clear error when user types
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const { name, value } = e.target;
 
-      // Show detailed error message
-      const errorMsg =
-        error instanceof Error
-          ? error.message
-          : "Payment verification failed: Unknown error";
+      setFormData((prev) => {
+        const newFormData = {
+          ...prev,
+          [name]: value,
+        };
+        // Save to localStorage immediately on user input change
+        if (typeof window !== "undefined") {
+          localStorage.setItem("paymentFormData", JSON.stringify(newFormData));
+        }
+        return newFormData;
+      });
 
-      setError(errorMsg);
+      if (error) setError(null);
+    },
+    [error] // Clear error when inputs change
+  );
 
-      // Create error toast for more visibility
-      const errorToast = document.createElement("div");
-      errorToast.className =
-        "fixed bottom-4 left-4 bg-red-50 text-red-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in max-w-md";
-      errorToast.innerHTML = `
-        <div class="flex items-start gap-2">
-          <span class="text-xl">❌</span>
-          <div>
-            <p class="font-semibold">Payment Error</p>
-            <p class="text-sm break-words">${errorMsg}</p>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(errorToast);
-
-      // Remove error toast after 5 seconds
-      setTimeout(() => {
-        errorToast.classList.add("animate-slide-out");
-        setTimeout(() => errorToast.remove(), 300);
-      }, 5000);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value, type } = e.target;
-    const checked = (e.target as HTMLInputElement).checked;
-
-    setFormData((prev: any) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  };
-
-  const baseInputClasses =
-    "w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 placeholder-gray-400";
-  const baseSelectClasses =
-    "w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed";
-  const baseButtonClasses =
-    "w-full bg-purple-800 text-white py-4 rounded-lg transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] hover:bg-purple-900 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none";
-
-  const copyToClipboard = (text: string) => {
+  // Memoized function to copy text to clipboard and show toast
+  const copyToClipboard = useCallback((text: string | null | undefined) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
 
-    // Show toast notification
     const toast = document.createElement("div");
     toast.className =
       "fixed top-4 right-4 bg-purple-50 text-purple-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
-    toast.innerHTML = `
-      <div class="flex items-center gap-2">
-        <span>📋</span>
-        <p>Address copied to clipboard!</p>
-      </div>
-    `;
+    toast.innerHTML = `<div class="flex items-center gap-2"><span>📋</span><p>Address copied to clipboard!</p></div>`;
     document.body.appendChild(toast);
 
-    // Remove toast after 2 seconds
     setTimeout(() => {
       toast.classList.add("animate-slide-out");
       setTimeout(() => toast.remove(), 300);
     }, 2000);
-  };
+  }, []);
 
-  const BananaCrystalFooter = () => (
-    <div className="mt-8 pt-6 border-t border-gray-200">
-      <div className="flex justify-center items-center opacity-80 hover:opacity-100 transition-opacity">
-        <span className="text-gray-500 text-sm mr-2">Powered by</span>
-        <a
-          href="https://bananacrystal.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center"
-        >
-          <LogoComponent />
-        </a>
-      </div>
-    </div>
-  );
+  const brandPurple = "#4c3f84";
+  const baseInputClasses = `w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-[${brandPurple}] focus:border-[${brandPurple}] disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 placeholder-gray-400 text-sm`;
+  const baseSelectClasses = `w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-[${brandPurple}] focus:border-[${brandPurple}] text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed text-sm`;
+  const baseButtonClasses = `w-full bg-[${brandPurple}] text-white py-3 sm:py-4 rounded-lg transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] hover:opacity-90 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none text-lg font-semibold`;
+  const secondaryButtonClasses =
+    "w-full bg-gray-200 text-gray-800 py-3 rounded-lg transition-all duration-300 hover:bg-gray-300 text-lg font-semibold";
 
-  if (step === 1) {
+  // --- Loading/Error state before rendering the form ---
+  if (storeLoading) {
     return (
-      <div className="max-w-xl w-full mx-auto bg-white rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500">
-        <h2 className="text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">
-          Payment Details
-        </h2>
-
-        <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
-          <div className="bg-purple-50 rounded-lg p-4 sm:p-6">
-            <div className="flex items-center gap-3 text-gray-900">
-              <span className="text-2xl">🛍️</span>
-              <p className="text-lg font-medium">{description}</p>
-            </div>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 rounded-lg p-4 animate-shake">
-              <p className="text-red-800 text-sm flex items-center gap-2">
-                <span>⚠️</span> {error}
-              </p>
-            </div>
-          )}
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-          <div className="bg-gray-50 rounded-lg p-4 sm:p-6 border border-gray-100">
-            <div className="flex justify-between mb-3">
-              <span className="text-gray-600">Amount:</span>
-              <span className="font-bold text-gray-900">
-                {formatCurrency(amount)} {formData.currency}
-              </span>
-            </div>
-            <div className="flex justify-between font-bold">
-              <span className="text-gray-600">USD Equivalent:</span>
-              <span className="text-purple-800">
-                ${formatCurrency(formData.usd_amount)}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="firstName"
-                className="block text-gray-900 mb-2 font-medium"
-              >
-                First Name
-              </label>
-              <input
-                type="text"
-                id="firstName"
-                name="firstName"
-                required
-                className={baseInputClasses}
-                value={formData.firstName}
-                onChange={handleInputChange}
-                placeholder="John"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="lastName"
-                className="block text-gray-900 mb-2 font-medium"
-              >
-                Last Name
-              </label>
-              <input
-                type="text"
-                id="lastName"
-                name="lastName"
-                required
-                className={baseInputClasses}
-                value={formData.lastName}
-                onChange={handleInputChange}
-                placeholder="Doe"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-gray-900 mb-2 font-medium"
-            >
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              required
-              className={baseInputClasses}
-              value={formData.email}
-              onChange={handleInputChange}
-              placeholder="john@example.com"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="phoneNumber"
-              className="block text-gray-900 mb-2 font-medium"
-            >
-              Phone Number
-            </label>
-            <div className="flex">
-              <select
-                value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value)}
-                className={`${baseSelectClasses} rounded-r-none border-r-0 w-24 bg-gray-100`}
-              >
-                {COUNTRY_CODES.map((country) => (
-                  <option key={country.code} value={country.code}>
-                    {country.code}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="tel"
-                id="phoneNumber"
-                name="phoneNumber"
-                required
-                className={`${baseInputClasses} rounded-l-none`}
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                placeholder="8012345678"
-              />
-            </div>
-          </div>
-
-          {/* Expanded Address Fields */}
-          <div>
-            <label
-              htmlFor="street"
-              className="block text-gray-900 mb-2 font-medium"
-            >
-              Street Address
-            </label>
-            <input
-              type="text"
-              id="street"
-              name="street"
-              required
-              className={baseInputClasses}
-              value={formData.street}
-              onChange={handleInputChange}
-              placeholder="123 Main St"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="city"
-                className="block text-gray-900 mb-2 font-medium"
-              >
-                City
-              </label>
-              <input
-                type="text"
-                id="city"
-                name="city"
-                required
-                className={baseInputClasses}
-                value={formData.city}
-                onChange={handleInputChange}
-                placeholder="City"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="state"
-                className="block text-gray-900 mb-2 font-medium"
-              >
-                State/Province
-              </label>
-              <input
-                type="text"
-                id="state"
-                name="state"
-                className={baseInputClasses}
-                value={formData.state}
-                onChange={handleInputChange}
-                placeholder="State"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="postalCode"
-                className="block text-gray-900 mb-2 font-medium"
-              >
-                Postal/ZIP Code
-              </label>
-              <input
-                type="text"
-                id="postalCode"
-                name="postalCode"
-                className={baseInputClasses}
-                value={formData.postalCode}
-                onChange={handleInputChange}
-                placeholder="Postal Code"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="country"
-                className="block text-gray-900 mb-2 font-medium"
-              >
-                Country
-              </label>
-              <input
-                type="text"
-                id="country"
-                name="country"
-                className={baseInputClasses}
-                value={formData.country}
-                onChange={handleInputChange}
-                placeholder="Country"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className={baseButtonClasses}
-            disabled={loading}
-          >
-            Next →
-          </button>
-        </form>
-
+      <div className="max-w-xl w-full mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
+        <svg
+          className={`animate-spin mx-auto h-10 w-10 text-[${brandPurple}]`}
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          ></circle>
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
+        </svg>
+        <p className="mt-4 text-gray-700">Loading store details...</p>
         <BananaCrystalFooter />
       </div>
     );
   }
 
-  return (
-    <div className="max-w-xl w-full mx-auto bg-white rounded-xl shadow-2xl p-6 sm:p-8 transform transition-all duration-500">
-      <h2 className="text-3xl font-bold mb-6 sm:mb-8 text-gray-900 text-center">
-        Make Payment
-      </h2>
-
-      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-        <div className="bg-gray-50 rounded-lg p-4 sm:p-6 border border-gray-100">
-          <div className="flex justify-between font-bold">
-            <span className="text-gray-900">Total Amount:</span>
-            <span className="text-gray-900">
-              {formatCurrency(formData.amount)} {formData.currency}
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-purple-50 rounded-lg p-4 sm:p-6">
-          <div className="text-center">
-            <div className="text-purple-800 font-medium mb-2">
-              USDT Amount to Pay
-            </div>
-            <div className="text-3xl font-bold text-gray-900">
-              ${formatCurrency(formData.usd_amount.toFixed(2))} USDT
-            </div>
-          </div>
-        </div>
-
-        {/* Improved wallet address section */}
-        <div className="bg-gradient-to-br from-purple-900 via-purple-800 to-purple-900 rounded-2xl p-6 sm:p-8 border border-purple-700 text-white shadow-2xl">
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <span className="font-bold text-lg sm:text-xl">
-                Send Payment To This Address
-              </span>
-              <button
-                type="button"
-                onClick={() => copyToClipboard(formData.wallet_address)}
-                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-semibold flex items-center transition"
+  // If store details failed to load AND we don't have an effective wallet address from params
+  if (storeError && !effectiveWalletAddress) {
+    return (
+      <div className="max-w-xl w-full mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
+        <p className="text-red-600 mb-4">
+          ⚠️ {storeError}
+          <span className="block mt-2">
+            Could not load necessary store information and no fallback payment
+            address was provided.
+          </span>
+        </p>
+        <p className="text-gray-600 text-sm">
+          Please refresh the page or contact support if the problem persists.
+          {storeDetails?.store_support_email && (
+            <span className="block mt-2">
+              Support Email:{" "}
+              <a
+                href={`mailto:${storeDetails.store_support_email}`}
+                className="underline"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
-                  />
-                </svg>
-                Copy
-              </button>
-            </div>
+                {storeDetails.store_support_email}
+              </a>
+            </span>
+          )}
+        </p>
+        <BananaCrystalFooter />
+      </div>
+    );
+  }
 
-            <div className="bg-orange-100/10 p-4 rounded-xl border border-orange-400/30">
-              <p className="font-mono text-base sm:text-lg break-words text-green-400 select-all">
-                {formData.wallet_address}
-              </p>
-            </div>
-            <p className="text-xs sm:text-sm text-white/70 mt-3 text-center">
-              Polygon/MATIC Network Only
-            </p>
-          </div>
-
-          <div className="bg-orange-100/10 p-4 rounded-xl border border-orange-400/30">
-            <div className="flex items-start space-x-3">
-              <div className="text-yellow-300 text-xl flex-shrink-0">⚠️</div>
-              <div>
-                <p className="text-orange-300 font-semibold text-base">
-                  Important Instructions:
-                </p>
-                <ul className="list-disc pl-5 mt-2 space-y-2 text-sm sm:text-base text-orange-200">
-                  <li>
-                    Send{" "}
-                    <span className="font-bold text-white">
-                      ${formatCurrency(formData.usd_amount.toFixed(2))} USDT
-                    </span>{" "}
-                    to the address above
-                  </li>
-                  <li>
-                    Make sure you're using the{" "}
-                    <span className="font-bold text-white">
-                      Polygon/MATIC Network
-                    </span>
-                  </li>
-                  <li>After sending, copy your transaction hash below</li>
-                  <li>Payments on other networks will be lost</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <label
-            htmlFor="trxn_hash"
-            className="block text-gray-900 mb-2 font-medium"
-          >
-            Transaction Hash
-          </label>
-          <input
-            type="text"
-            id="trxn_hash"
-            name="trxn_hash"
-            required
-            className={baseInputClasses}
-            value={formData.trxn_hash}
-            onChange={handleInputChange}
-            placeholder="0x..."
-          />
-          <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Enter the transaction hash after sending the USDT payment
+  // If we finished loading, but still no effective wallet address
+  // This is a separate error state from store loading failure
+  if (!storeLoading && !effectiveWalletAddress) {
+    return (
+      <div className="max-w-xl w-full mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
+        <p className="text-red-600 mb-4">
+          ⚠️ Payment address is missing.
+          <span className="block mt-2">
+            Cannot accept payments at this time. Please contact the store.
+          </span>
+        </p>
+        {storeDetails?.store_support_email && (
+          <p className="text-gray-600 text-sm mt-4">
+            Support Email:{" "}
+            <a
+              href={`mailto:${storeDetails.store_support_email}`}
+              className="underline"
+            >
+              {storeDetails.store_support_email}
+            </a>
           </p>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 rounded-lg p-4 animate-shake">
-            <p className="text-red-800 text-sm flex items-center gap-2">
-              <span>⚠️</span> {error}
-            </p>
-          </div>
         )}
+        <BananaCrystalFooter />
+      </div>
+    );
+  }
 
-        <div className="space-y-4">
-          <button
-            type="submit"
-            className={baseButtonClasses}
-            disabled={loading}
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Processing...
-              </span>
-            ) : (
-              "Confirm Payment"
+  // --- Main Form Render (only if !storeLoading AND effectiveWalletAddress is available) ---
+  // Add storeError || !effectiveWalletAddress check here too?
+  // The above checks already handle the cases where we should NOT render the form.
+  // So if we reach here, it's safe to render.
+  return (
+    <div className="max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+      <div
+        className={`bg-white rounded-xl shadow-2xl overflow-hidden md:grid md:grid-cols-2 transform transition-all duration-500 min-h-[600px] border border-[${brandPurple}]`}
+      >
+        {/* Left Column: Store Information & Branding */}
+        <div
+          className={`bg-[${brandPurple}] text-white p-6 sm:p-8 flex flex-col justify-between rounded-t-xl md:rounded-tr-none md:rounded-l-xl`}
+        >
+          <div>
+            <div className="mb-6 text-center">
+              {storeDetails?.store_logo ? (
+                <img
+                  src={storeDetails.store_logo}
+                  alt={`${storeDetails.name} logo`}
+                  className="mx-auto h-24 w-24 object-cover rounded-full border-4 border-white shadow-md"
+                />
+              ) : (
+                <div
+                  className={`mx-auto h-24 w-24 bg-purple-600 rounded-full flex items-center justify-center text-4xl font-bold text-white shadow-md`}
+                >
+                  {storeDetails?.name
+                    ? storeDetails.name.charAt(0).toUpperCase()
+                    : storeId.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-center mb-2">
+              {storeDetails?.name || `Store ${storeId}`}
+            </h1>
+            {storeDetails?.store_username && (
+              <p className="text-purple-200 text-center text-lg sm:text-xl mb-6">
+                @{storeDetails.store_username}
+              </p>
             )}
-          </button>
-
-          <button
-            type="button"
-            className="w-full bg-gray-200 text-gray-800 py-3 rounded-lg transition-all duration-300 hover:bg-gray-300"
-            onClick={() => setStep(1)}
-          >
-            Back to Details
-          </button>
+            <div className="bg-purple-600/30 rounded-lg p-4 mb-6 space-y-3">
+              {storeDetails?.store_support_email && (
+                <div className="flex items-center text-purple-100 text-base">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5 mr-3 text-purple-200"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                  </svg>
+                  <a
+                    href={`mailto:${storeDetails.store_support_email}`}
+                    className="hover:underline break-words"
+                  >
+                    {storeDetails.store_support_email}
+                  </a>
+                </div>
+              )}
+              {storeDetails?.store_url && (
+                <div className="flex items-center text-purple-100 text-base">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5 mr-3 text-purple-200"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0l3 3a2 2 0 11-2.828 2.828l-3-3a2 2 0 010-2.828 1 1 0 00-1.414-1.414 4 4 0 00-5.656 0l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5a2 2 0 002.828 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <a
+                    href={storeDetails.store_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline break-words"
+                  >
+                    {storeDetails.store_url.replace(/^https?:\/\/(www\.)?/, "")}
+                  </a>
+                </div>
+              )}
+            </div>
+            <div className="text-center text-purple-200 text-base italic mt-6">
+              {description}
+            </div>
+          </div>
+          <BananaCrystalFooter />
         </div>
-      </form>
 
-      <BananaCrystalFooter />
+        {/* Right Column: Form Steps */}
+        <div className="p-6 sm:p-8 flex flex-col justify-between rounded-b-xl md:rounded-bl-none md:rounded-r-xl">
+          {step === 1 && (
+            <PaymentDetailsStep
+              formData={formData}
+              setFormData={setFormData} // Pass setFormData down (handlers should save to localStorage)
+              handleInputChange={handleInputChange} // Updated to save to localStorage
+              countryCode={countryCode}
+              setCountryCode={setCountryCode} // Consider if countryCode needs localStorage save here or only in main effect
+              handleSubmit={handleSubmit} // Updated to set loading state
+              loading={loading}
+              error={error}
+              canProceedToPayment={canProceedToPayment}
+              totalAmountDue={totalAmountDue}
+              totalUsdAmountDue={totalUsdAmountDue}
+              processingFee={processingFee}
+              storeError={storeError} // Pass storeError down for potential display
+              effectiveWalletAddress={effectiveWalletAddress} // Pass effective address down
+            />
+          )}
+
+          {step === 2 && (
+            <PaymentCompleteStep
+              formData={formData}
+              handleInputChange={handleInputChange} // Updated to save to localStorage
+              handleSubmit={handleSubmit} // Updated to set loading state
+              loading={loading}
+              error={error}
+              effectiveWalletAddress={effectiveWalletAddress} // Pass effective address down
+              totalAmountDue={totalAmountDue}
+              totalUsdAmountDue={totalUsdAmountDue}
+              processingFee={processingFee}
+              processingFeeUsd={processingFeeUsd}
+              timerActive={timerActive}
+              timeLeft={timeLeft}
+              handleMoreTime={handleMoreTime} // Updated to save state on click
+              copyToClipboard={copyToClipboard}
+              handlePasteTransactionHash={handlePasteTransactionHash} // Updated to save to localStorage
+              resetSession={resetSession} // Updated to potentially reset state instead of reload
+              storeError={storeError} // Pass storeError down
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
