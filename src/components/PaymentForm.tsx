@@ -761,6 +761,7 @@ export default function PaymentForm({
             <h1 className="text-3xl sm:text-4xl font-extrabold text-center mb-2">
               {storeDetails?.name || `Store ${storeId}`}
             </h1>
+           
 
             {storeDetails?.store_username && (
               <p className="text-purple-200 text-center text-lg sm:text-xl mb-6">
