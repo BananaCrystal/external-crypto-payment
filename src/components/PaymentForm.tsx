@@ -407,35 +407,30 @@ export default function PaymentForm({
             return;
           }
 
-          // Send incomplete CRM data *before* changing step
           await sendToCRM("incomplete");
 
-          // Move to step 2
           setStep(2);
           setTimeLeft(TIMER_DURATION);
           setTimerActive(true);
-          // Save state to localStorage when moving step
           if (typeof window !== "undefined") {
             localStorage.setItem("paymentTimeLeft", TIMER_DURATION.toString());
             localStorage.setItem("paymentTimerActive", "true");
             localStorage.setItem("paymentStep", "2");
-            // formData is already saved by input handlers or the sync effect
           }
 
-          setLoading(false); // Reset loading after successfully moving step
-          return; // Exit function after step 1 submission
+          setLoading(false);
+          return;
         }
 
-        // Logic for step 2 submission
         if (!timerActive) {
           setError("Payment window expired. Please request more time.");
-          setLoading(false); // Reset loading on timer error
+          setLoading(false);
           return;
         }
 
         if (!formData.trxn_hash) {
           setError("Please enter the transaction hash to confirm payment.");
-          setLoading(false); // Reset loading on validation error
+          setLoading(false);
           return;
         }
 
@@ -443,19 +438,17 @@ export default function PaymentForm({
           setError(
             "Payment address not available. Cannot proceed with payment."
           );
-          setLoading(false); // Reset loading on logic error
+          setLoading(false);
           console.error(
             "Payment attempt failed: Effective wallet address is missing."
           );
           return;
         }
 
-        // If we reach here, it's step 2 and validation passed. Proceed with API calls.
         console.log("Proceeding with payment verification API calls...");
 
         const fullAddress = `${formData.street}, ${formData.city}, ${formData.state}, ${formData.postalCode}, ${formData.country}`;
 
-        // Attempt User Signup (non-blocking for payment flow)
         try {
           await fetch(USER_SIGNUP_URL, {
             method: "POST",
@@ -471,27 +464,25 @@ export default function PaymentForm({
           console.log("Signup request sent.");
         } catch (error) {
           console.error("Signup error:", error);
-          // Don't block payment for signup failure
         }
 
-        // Submit Payment Verification
         console.log("Sending payment data to API...");
         const response = await fetch(PAYMENT_API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            amount: formData.amount, // Use state value
-            currency: formData.currency, // Use state value
+            amount: formData.amount,
+            currency: formData.currency,
             description: description,
-            usd_amount: formData.usd_amount, // Use state value
+            usd_amount: totalUsdAmountDue.toFixed(2),
             first_name: formData.firstName,
             last_name: formData.lastName,
             email: formData.email,
             phone: `${countryCode}${formData.phoneNumber}`,
             address: fullAddress,
             trxn_hash: formData.trxn_hash,
-            signup_consent: true, // Assuming consent is implied by submitting form
-            wallet_address: effectiveWalletAddress, // Use the effective wallet address
+            signup_consent: true,
+            wallet_address: effectiveWalletAddress,
           }),
         });
 
@@ -508,7 +499,6 @@ export default function PaymentForm({
             responseText,
             error
           );
-          // If parsing fails but status is OK, might still be a success depending on API contract
           if (!(response.status >= 200 && response.status < 300)) {
             throw new Error(
               `Payment verification failed: Invalid response from server. Raw: ${responseText}`
@@ -518,10 +508,8 @@ export default function PaymentForm({
 
         if (response.status >= 200 && response.status < 300) {
           console.log("Payment successful:", result || "No response body");
-          // Send complete CRM data
           await sendToCRM("complete");
 
-          // Clear localStorage on successful completion
           if (typeof window !== "undefined") {
             localStorage.removeItem("paymentStep");
             localStorage.removeItem("paymentFormData");
@@ -534,7 +522,6 @@ export default function PaymentForm({
             }
           }
 
-          // Show success toast and redirect
           const successMessage = document.createElement("div");
           successMessage.className =
             "fixed top-4 right-4 bg-green-50 text-green-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
@@ -548,18 +535,11 @@ export default function PaymentForm({
               if (redirect_url) {
                 window.location.href = redirect_url;
               } else {
-                // If no redirect, maybe show a "Payment Complete" step
                 console.log("Payment complete, no redirect URL provided.");
-                // You might want to set a final step or state here if no redirect
-                // setStep(3); // Example
               }
             }, 300);
           }, 3000);
-
-          // Do NOT setStep(3) or similar here if redirecting, as it will be interrupted.
-          // If NOT redirecting, uncomment setStep(3) or handle final state.
         } else {
-          // Handle API errors (non-2xx status codes)
           console.error("Payment API response error:", response.status, result);
           const errorMessage =
             result?.message ||
@@ -568,19 +548,17 @@ export default function PaymentForm({
               ? `Payment verification failed: ${responseText}`
               : `Payment verification failed (Status: ${response.status})`);
 
-          throw new Error(errorMessage); // Throw to be caught by the catch block
+          throw new Error(errorMessage);
         }
       } catch (error: any) {
-        // Handle any errors during submission (validation, API errors, network)
         console.error("Payment submission error:", error);
         const errorMsg =
           error instanceof Error
             ? error.message
             : "Payment verification failed: Unknown error";
 
-        setError(errorMsg); // Set form-level error
+        setError(errorMsg);
 
-        // Show error toast
         const errorToast = document.createElement("div");
         errorToast.className =
           "fixed bottom-4 left-4 bg-red-50 text-red-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in max-w-md";
@@ -592,24 +570,25 @@ export default function PaymentForm({
           setTimeout(() => errorToast.remove(), 300);
         }, 7000);
       } finally {
-        setLoading(false); // Always reset loading state in finally block
+        setLoading(false);
       }
     },
     [
-      step, // Dependency because logic changes based on step
-      formData, // Dependency because form data is submitted
-      countryCode, // Dependency for phone number
-      description, // Dependency for API call
-      redirect_url, // Dependency for redirect logic
-      sendToCRM, // Dependency for CRM call
-      effectiveWalletAddress, // Dependency for payment address check and API call
-      timerActive, // Dependency for timer check
-      USER_SIGNUP_URL, // Dependency for API call
-      PAYMENT_API_URL, // Dependency for API call
-      initialAmount, // Include initial props as dependencies if they influence submission logic (less likely, but safe)
+      step,
+      formData,
+      countryCode,
+      description,
+      redirect_url,
+      sendToCRM,
+      effectiveWalletAddress,
+      timerActive,
+      USER_SIGNUP_URL,
+      PAYMENT_API_URL,
+      initialAmount,
       initialCurrency,
       initialUsdAmount,
-      canProceedToPayment, // Include derived state used in logic
+      canProceedToPayment,
+      totalUsdAmountDue, // This is correctly in the dependency array
     ]
   );
 
@@ -780,6 +759,7 @@ export default function PaymentForm({
             <h1 className="text-3xl sm:text-4xl font-extrabold text-center mb-2">
               {storeDetails?.name || `Store ${storeId}`}
             </h1>
+          
             {storeDetails?.store_username && (
               <p className="text-purple-200 text-center text-lg sm:text-xl mb-6">
                 @{storeDetails.store_username}
