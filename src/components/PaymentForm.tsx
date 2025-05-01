@@ -296,6 +296,7 @@ export default function PaymentForm({
           description: description,
           processingFee: processingFee,
           totalAmountDue: totalAmountDue,
+
           totalUsdAmountDue: totalUsdAmountDue,
         };
 
@@ -471,8 +472,9 @@ export default function PaymentForm({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            amount: formData.amount,
+            gross_amount: totalAmountDue.toFixed(2),
             currency: formData.currency,
+            fees: processingFee.toFixed(2),
             description: description,
             usd_amount: totalUsdAmountDue.toFixed(2),
             first_name: formData.firstName,
@@ -759,7 +761,7 @@ export default function PaymentForm({
             <h1 className="text-3xl sm:text-4xl font-extrabold text-center mb-2">
               {storeDetails?.name || `Store ${storeId}`}
             </h1>
-          
+
             {storeDetails?.store_username && (
               <p className="text-purple-200 text-center text-lg sm:text-xl mb-6">
                 @{storeDetails.store_username}
