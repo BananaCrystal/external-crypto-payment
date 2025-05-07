@@ -15,6 +15,7 @@ import {
   CRM_INTEGRATION_URL,
 } from "@/constants/paymentConstants";
 import { COUNTRY_CODES } from "@/constants/countries";
+import { sendToGoHighLevel } from "@/helpers/sendToGoHighLevel";
 
 import { BananaCrystalFooter } from "./BananaCrystalFooter";
 import { PaymentDetailsStep } from "./PaymentDetailsStep";
@@ -51,6 +52,7 @@ export default function PaymentForm({
         lastName: savedFormData?.lastName || "",
         email: savedFormData?.email || "",
         phoneNumber: savedFormData?.phoneNumber || "",
+        tags: savedFormData?.tag || "incomplete",
         street: savedFormData?.street || "",
         city: savedFormData?.city || "",
         state: savedFormData?.state || "",
@@ -270,6 +272,20 @@ export default function PaymentForm({
     setStep(1);
   }, []);
 
+  // Modified function to send data to GoHighLevel with payment status
+  const sendToGHL = useCallback(
+    async (paymentStatus: "not paid" | "paid") => {
+      try {
+        console.log(`Sending data to GoHighLevel with status: ${paymentStatus}`);
+        await sendToGoHighLevel(formData, countryCode, paymentStatus);
+        console.log(`Contact sent to GoHighLevel successfully with ${paymentStatus} status.`);
+      } catch (ghlError: any) {
+        console.error(`Error sending contact to GoHighLevel with ${paymentStatus} status:`, ghlError);
+      }
+    },
+    [formData, countryCode]
+  );
+
   // Function to send data to CRM
   const sendToCRM = useCallback(
     async (status: "incomplete" | "complete") => {
@@ -397,6 +413,15 @@ export default function PaymentForm({
             return;
           }
 
+          // Send data to GoHighLevel with "not paid" status
+          try {
+            await sendToGHL("not paid");
+            console.log("Contact sent to GoHighLevel with 'not paid' status successfully.");
+          } catch (ghlError: any) {
+            // Log the error but continue with form submission
+            console.error("Error sending contact to GoHighLevel with 'not paid' status:", ghlError);
+          }
+
           if (!canProceedToPayment) {
             setError(
               "Payment address is not available. Cannot proceed to payment."
@@ -510,6 +535,16 @@ export default function PaymentForm({
 
         if (response.status >= 200 && response.status < 300) {
           console.log("Payment successful:", result || "No response body");
+          
+          // Send data to GoHighLevel with "paid" status after successful payment
+          try {
+            await sendToGHL("paid");
+            console.log("Contact sent to GoHighLevel with 'paid' status successfully.");
+          } catch (ghlError: any) {
+            // Log the error but continue
+            console.error("Error sending contact to GoHighLevel with 'paid' status:", ghlError);
+          }
+          
           await sendToCRM("complete");
 
           if (typeof window !== "undefined") {
@@ -590,7 +625,8 @@ export default function PaymentForm({
       initialCurrency,
       initialUsdAmount,
       canProceedToPayment,
-      totalUsdAmountDue, // This is correctly in the dependency array
+      totalUsdAmountDue,
+      sendToGHL, // Added this dependency
     ]
   );
 
@@ -761,7 +797,6 @@ export default function PaymentForm({
             <h1 className="text-3xl sm:text-4xl font-extrabold text-center mb-2">
               {storeDetails?.name || `Store ${storeId}`}
             </h1>
-           
 
             {storeDetails?.store_username && (
               <p className="text-purple-200 text-center text-lg sm:text-xl mb-6">
