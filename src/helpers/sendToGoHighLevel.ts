@@ -33,7 +33,7 @@ export const sendToGoHighLevel = async (
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb2NhdGlvbl9pZCI6InVIUGNTUThabWN2bFJsQk80cXplIiwidmVyc2lvbiI6MSwiaWF0IjoxNzQ2NjIzNjEyNTUyLCJzdWIiOiJDekFyZG1YMmZYZXJaWEc5WUFaUCJ9.rlMUcYNg0qmxT4uw6Eeyo_rnXS052zhiKhVJKf2iTC8`,
+            Authorization: `Bearer `,
           },
           body: JSON.stringify(payload),
         }
