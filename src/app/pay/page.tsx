@@ -22,7 +22,6 @@ function validateParams(params: SearchParams) {
   if (!params.description) errors.push("Description is required");
   if (!params.usd_amount || isNaN(parseFloat(params.usd_amount)))
     errors.push("Valid USD amount is required");
-  if (!params.wallet_address) errors.push("Wallet address is required");
 
   return errors;
 }

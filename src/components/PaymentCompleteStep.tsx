@@ -275,7 +275,7 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
                 Processing...
               </span>
             ) : (
-              "Confirm Payment"
+              "Confirm Your Payment"
             )}
           </button>
 
