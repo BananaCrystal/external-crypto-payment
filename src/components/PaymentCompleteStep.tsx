@@ -92,88 +92,56 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
         </div>
       </div>
 
-      {/* USDT Amount to Pay - Shows total including fee */}
-      <div className={`bg-[#4c3f84] rounded-lg p-4 sm:p-6 mb-6 text-white`}>
-        <div className="text-center">
-          <div className="font-medium mb-2 text-purple-200">
-            Total USDT Amount to Pay
-          </div>
-          <div className="text-3xl font-bold text-white">
-            ${formatCurrency(totalUsdAmountDue.toFixed(2))} USDT
-          </div>
-        </div>
-      </div>
-
       {/* Wallet Address Section - Using effectiveWalletAddress */}
       <div className="bg-gray-100 rounded-2xl p-6 sm:p-8 border border-gray-200 text-gray-900 shadow-inner mb-6">
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <span className="font-bold text-lg sm:text-xl text-gray-800">
-              Send Payment To This Address
-            </span>
-            {/* Copy to Clipboard Button */}
-            <button
-              type="button"
-              onClick={() => copyToClipboard(effectiveWalletAddress)}
-              className={`bg-[#4c3f84] hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-semibold flex items-center transition`}
-              disabled={!effectiveWalletAddress || loading}
+        {/* Wallet Address Display - Using effectiveWalletAddress */}
+        <div className="flex justify-between items-center mb-4">
+          <span className="font-bold text-lg sm:text-xl text-gray-800">
+            Send Payment To This Address
+          </span>
+          {/* Copy to Clipboard Button */}
+          <button
+            type="button"
+            onClick={() => copyToClipboard(effectiveWalletAddress)}
+            className={`bg-[#4c3f84] hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-semibold flex items-center transition`}
+            disabled={!effectiveWalletAddress || loading}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5 mr-2"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
-                />
-              </svg>
-              Copy
-            </button>
-          </div>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
+              />
+            </svg>
+            Copy
+          </button>
+        </div>
 
-          {/* Wallet Address Display - Using effectiveWalletAddress */}
-          <div className="bg-white p-4 rounded-xl border border-gray-300">
-            <p className="font-mono text-base sm:text-lg break-words text-green-600 select-all">
-              {effectiveWalletAddress || "Wallet address unavailable."}
-            </p>
-          </div>
-          <p className="text-sm sm:text-base font-bold text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2 mt-4 text-center shadow-sm">
-            Polygon/MATIC Network Only
+        <div className="bg-white p-4 rounded-xl border border-gray-300">
+          <p className="font-mono text-base sm:text-lg break-words text-green-600 select-all">
+            {effectiveWalletAddress || "Wallet address unavailable."}
           </p>
         </div>
 
-        {/* Important Instructions */}
-        <div className="bg-orange-100 rounded-xl p-4 border border-orange-300">
-          <div className="flex items-start space-x-3">
-            <div className="text-orange-500 text-xl flex-shrink-0">⚠️</div>
-            <div>
-              <p className="text-orange-800 font-semibold text-base">
-                Important Instructions:
-              </p>
-              <ul className="list-disc pl-5 mt-2 space-y-2 text-sm sm:text-base text-orange-700">
-                <li>
-                  Send{" "}
-                  <span className="font-bold text-gray-900">
-                    ${formatCurrency(totalUsdAmountDue.toFixed(2))} USDT
-                  </span>{" "}
-                  to the address above (includes 1.99% fee)
-                </li>
-                <li>
-                  Make sure you're using the{" "}
-                  <span className="font-bold text-gray-900">
-                    Polygon/MATIC Network
-                  </span>
-                </li>
-                <li>
-                  After sending, copy your transaction hash and paste below
-                </li>
-                <li>Payments on other networks will be lost</li>
-              </ul>
+        <p className="text-sm sm:text-base font-bold text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2 mt-4 text-center shadow-sm">
+          Polygon/MATIC Network Only
+        </p>
+
+        {/* USDT Amount to Pay - Shows total including fee */}
+        <div className={`bg-[#4c3f84] rounded-lg p-4 sm:p-5 mt-4 text-white`}>
+          <div className="text-center">
+            <div className="font-medium mb-1 text-purple-200">
+              Total USDT Amount to Pay
+            </div>
+            <div className="text-2xl font-bold text-white">
+              ${formatCurrency(totalUsdAmountDue.toFixed(2))} USDT
             </div>
           </div>
         </div>
@@ -199,8 +167,6 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
             Transaction Hash <span className="text-red-500">*</span>
           </label>
           <div className="relative">
-            {" "}
-            {/* Added relative positioning */}
             <input
               type="text"
               id="trxn_hash"
@@ -217,8 +183,8 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
               <button
                 type="button"
                 onClick={handlePasteTransactionHash}
-                className={`absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`} // Adjusted styling
-                disabled={loading || !effectiveWalletAddress || !timerActive} // Same disabled logic as input
+                className={`absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}
+                disabled={loading || !effectiveWalletAddress || !timerActive}
                 title="Paste Transaction Hash"
               >
                 {/* Paste Icon */}
@@ -252,9 +218,11 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
             }
           >
             {loading ? (
-              <span className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center">
                 <svg
-                  className="animate-spin h-5 w-5 text-white"
+                  className="animate-spin -ml-1 mr-2 h-5 w-5 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
                   viewBox="0 0 24 24"
                 >
                   <circle
@@ -264,48 +232,39 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
                     r="10"
                     stroke="currentColor"
                     strokeWidth="4"
-                    fill="none"
-                  />
+                  ></circle>
                   <path
                     className="opacity-75"
                     fill="currentColor"
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
+                  ></path>
                 </svg>
-                Processing...
-              </span>
+                Processing Payment...
+              </div>
             ) : (
-              "Confirm Your Payment"
+              "Submit Payment"
             )}
           </button>
 
-          {!timerActive && !loading && (
+          {!timerActive ? (
             <button
               type="button"
-              className={baseButtonClasses}
               onClick={handleMoreTime}
+              className={baseButtonClasses}
+              disabled={loading}
             >
-              Need More Time?
+              Request More Time
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={resetSession}
+              className={secondaryButtonClasses}
+              disabled={loading}
+            >
+              Cancel & Start Over
             </button>
           )}
-
-          <button
-            type="button"
-            className={secondaryButtonClasses}
-            onClick={() => resetSession()} // Resetting goes back to Step 1 implicitly by reloading
-            disabled={loading}
-          >
-            ← Back to Details
-          </button>
-
-          {/* <button
-            type="button"
-            className="w-full text-gray-600 py-2 text-sm hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={resetSession}
-            disabled={loading}
-          >
-            Start Over
-          </button> */}
         </div>
       </form>
     </div>
