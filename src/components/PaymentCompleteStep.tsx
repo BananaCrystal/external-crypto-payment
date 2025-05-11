@@ -11,19 +11,22 @@ import CryptoJS from "crypto-js";
 
 interface PaymentCompleteStepProps {
   formData: Omit<FormData, "wallet_address">;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleSubmit: (e: React.FormEvent) => Promise<void>;
+  handleInputChange: (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => void;
+  handleSubmit: (e: React.FormEvent) => void;
   loading: boolean;
   error: string | null;
-  effectiveWalletAddress: string | null | undefined;
+  effectiveWalletAddress: string | null;
   totalAmountDue: number;
   totalUsdAmountDue: number;
   processingFee: number;
   processingFeeUsd: number;
   copyToClipboard: (text: string | null | undefined) => void;
-  handlePasteTransactionHash: () => Promise<void>;
+  handlePasteTransactionHash: () => void;
   resetSession: () => void;
   storeError: string | null;
+  disabled?: boolean;
 }
 
 // Add decryption utility
@@ -49,6 +52,7 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
   handlePasteTransactionHash,
   resetSession,
   storeError,
+  disabled,
 }) => {
   return (
     <div>
@@ -154,54 +158,55 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
         <div>
           <label
             htmlFor="trxn_hash"
-            className="block text-gray-900 mb-1 font-medium text-sm"
+            className="block text-sm font-medium text-gray-700 mb-1"
           >
-            Transaction Hash <span className="text-red-500">*</span>
+            Transaction Hash
           </label>
-          <div className="relative">
+          <div className="flex gap-2">
             <input
               type="text"
               id="trxn_hash"
               name="trxn_hash"
-              required
-              className={`${baseInputClasses} pr-10`}
               value={formData.trxn_hash}
               onChange={handleInputChange}
-              placeholder="0x..."
-              disabled={loading || !effectiveWalletAddress}
+              placeholder="Enter your transaction hash"
+              className={`w-full px-4 py-3 border rounded-lg transition-all duration-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 placeholder-gray-400 text-sm ${
+                disabled ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              disabled={loading || disabled}
             />
-            {/* Paste Button */}
-            {typeof navigator !== "undefined" && navigator.clipboard && (
-              <button
-                type="button"
-                onClick={handlePasteTransactionHash}
-                className={`absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}
-                disabled={loading || !effectiveWalletAddress}
-                title="Paste Transaction Hash"
+            <button
+              type="button"
+              onClick={handlePasteTransactionHash}
+              className={`px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium flex items-center gap-2 ${
+                disabled ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              disabled={loading || disabled}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                  <path d="M2 5a2 2 0 012-2h2a2 2 0 012 2v1H4a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-4V5a2 2 0 012-2h2a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" />
-                </svg>
-              </button>
-            )}
+                <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+              </svg>
+              Paste
+            </button>
           </div>
-          <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Enter or paste the transaction hash after sending the USDT payment.
-          </p>
         </div>
 
         {/* Action Buttons */}
         <div className="space-y-4">
           <button
             type="submit"
-            className={baseButtonClasses}
-            disabled={loading || !formData.trxn_hash || !effectiveWalletAddress}
+            disabled={loading || !formData.trxn_hash || disabled}
+            className={`w-full bg-[#4c3f84] text-white py-3 rounded-lg transition-all duration-300 ${
+              loading || !formData.trxn_hash || disabled
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:opacity-90 transform hover:scale-[1.01] active:scale-[0.99]"
+            }`}
           >
             {loading ? (
               <div className="flex items-center justify-center">
@@ -225,7 +230,7 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Processing Payment...
+                Processing...
               </div>
             ) : (
               "Submit Payment"
@@ -241,6 +246,16 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
             Cancel & Start Over
           </button>
         </div>
+
+        {/* Add a message when the form is disabled */}
+        {disabled && (
+          <div className="bg-red-50 p-3 rounded-lg">
+            <p className="text-red-700 text-sm flex items-center gap-2">
+              <span>⚠️</span> Payment window has expired. Please request more
+              time to proceed.
+            </p>
+          </div>
+        )}
       </form>
     </div>
   );
