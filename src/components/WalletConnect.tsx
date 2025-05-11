@@ -9,12 +9,8 @@ import {
   POLYGON_MUMBAI_CHAIN_ID,
 } from "@/helpers/walletHelpers";
 
-// Declare ethereum property on window
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
-}
+// Remove the duplicate Window interface declaration
+// The global type from window.d.ts will be used instead
 
 interface WalletConnectProps {
   onConnected: (address: string, signer: any) => void;
