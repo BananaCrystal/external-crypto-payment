@@ -216,7 +216,8 @@ const DirectPayment: React.FC<DirectPaymentProps> = ({
       // Create a user-friendly error message
       let errorMessage = "Payment failed. Please try again.";
 
-      if (err.message) {
+      // Type guard to check if err is an Error object
+      if (err instanceof Error) {
         if (err.message.includes("insufficient funds")) {
           errorMessage =
             "Insufficient USDT balance. Please add more USDT to your wallet.";
@@ -226,7 +227,7 @@ const DirectPayment: React.FC<DirectPaymentProps> = ({
         } else if (err.message.includes("switch to the Polygon")) {
           errorMessage =
             "Please switch to the Polygon/MATIC network to make your payment.";
-        } else if (err.code === "CALL_EXCEPTION") {
+        } else if ("code" in err && err.code === "CALL_EXCEPTION") {
           errorMessage =
             "Contract call failed. Please ensure you're on the Polygon network.";
         } else {
@@ -236,7 +237,7 @@ const DirectPayment: React.FC<DirectPaymentProps> = ({
       }
 
       setError(errorMessage);
-      onPaymentError(err);
+      onPaymentError(err instanceof Error ? err : new Error(errorMessage));
     } finally {
       setProcessing(false);
     }
