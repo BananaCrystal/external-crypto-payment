@@ -4,6 +4,21 @@ import { CURRENCIES } from "@/constants/countries";
 import { formatCurrency } from "@/helpers";
 import { useState, useEffect } from "react";
 import { LogoComponent } from "./LogoComponent";
+import CryptoJS from "crypto-js";
+
+// Add encryption key (in production, this should be in environment variables)
+const ENCRYPTION_KEY =
+  process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "your-fallback-encryption-key";
+
+// Add encryption/decryption utilities
+const encryptApiKey = (apiKey: string): string => {
+  return CryptoJS.AES.encrypt(apiKey, ENCRYPTION_KEY).toString();
+};
+
+const decryptApiKey = (encryptedKey: string): string => {
+  const bytes = CryptoJS.AES.decrypt(encryptedKey, ENCRYPTION_KEY);
+  return bytes.toString(CryptoJS.enc.Utf8);
+};
 
 interface StoreDetails {
   store_id: string;
@@ -11,14 +26,13 @@ interface StoreDetails {
   amount: string;
   currency: string;
   description: string;
+  product_name: string;
   redirect_url: string;
-  crm: {
+  countdown_minutes: number;
+  gohighlevel: {
     enabled: boolean;
-    provider: string;
     apiKey: string;
-    listId: string;
-    tagIncomplete: string;
-    tagComplete: string;
+    tags: string[];
   };
 }
 
@@ -36,22 +50,21 @@ export default function StoreIntegration() {
     amount: "",
     currency: "NGN",
     description: "",
+    product_name: "",
     redirect_url: "",
-    crm: {
+    countdown_minutes: 30,
+    gohighlevel: {
       enabled: false,
-      provider: "mailchimp",
       apiKey: "",
-      listId: "",
-      tagIncomplete: "payment_initiated",
-      tagComplete: "payment_completed",
+      tags: ["not_paid", "paid"],
     },
   });
   const [generatedLink, setGeneratedLink] = useState<string>("");
   const [usdAmount, setUsdAmount] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showCrmSettings, setShowCrmSettings] = useState(false);
   const [activeTab, setActiveTab] = useState("payment");
+  const [customTag, setCustomTag] = useState("");
 
   useEffect(() => {
     const fetchRate = async () => {
@@ -104,19 +117,23 @@ export default function StoreIntegration() {
       amount: formData.amount,
       currency: formData.currency,
       description: formData.description,
+      product_name: formData.product_name,
       redirect_url: formData.redirect_url,
       usd_amount: usdAmount.toFixed(2),
       wallet_address: formData.wallet_address,
+      countdown_minutes: formData.countdown_minutes.toString(),
     });
 
-    // Add CRM details if enabled
-    if (formData.crm.enabled) {
-      params.append("crm_enabled", "true");
-      params.append("crm_provider", formData.crm.provider);
-      params.append("crm_api_key", formData.crm.apiKey);
-      params.append("crm_list_id", formData.crm.listId);
-      params.append("crm_tag_incomplete", formData.crm.tagIncomplete);
-      params.append("crm_tag_complete", formData.crm.tagComplete);
+    // Add GoHighLevel details if enabled
+    if (formData.gohighlevel.enabled) {
+      params.append("gohighlevel_enabled", "true");
+      // Encrypt the API key before adding to URL
+      const encryptedApiKey = encryptApiKey(formData.gohighlevel.apiKey);
+      params.append("gohighlevel_api_key", encryptedApiKey);
+      params.append(
+        "gohighlevel_tags",
+        JSON.stringify(formData.gohighlevel.tags)
+      );
     }
 
     const link = `${baseUrl}/pay?${params.toString()}`;
@@ -130,13 +147,13 @@ export default function StoreIntegration() {
   ) => {
     const { name, value } = e.target;
 
-    if (name.startsWith("crm.")) {
-      const crmField = name.split(".")[1];
+    if (name.startsWith("gohighlevel.")) {
+      const field = name.split(".")[1];
       setFormData({
         ...formData,
-        crm: {
-          ...formData.crm,
-          [crmField]: value,
+        gohighlevel: {
+          ...formData.gohighlevel,
+          [field]: value,
         },
       });
     } else {
@@ -147,17 +164,38 @@ export default function StoreIntegration() {
     }
   };
 
-  const handleCrmToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGHLToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
-      crm: {
-        ...formData.crm,
+      gohighlevel: {
+        ...formData.gohighlevel,
         enabled: e.target.checked,
       },
     });
+  };
 
-    if (e.target.checked) {
-      setShowCrmSettings(true);
+  const handleAddTag = () => {
+    if (customTag && formData.gohighlevel.tags.length < 4) {
+      setFormData({
+        ...formData,
+        gohighlevel: {
+          ...formData.gohighlevel,
+          tags: [...formData.gohighlevel.tags, customTag],
+        },
+      });
+      setCustomTag("");
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    if (tagToRemove !== "not_paid" && tagToRemove !== "paid") {
+      setFormData({
+        ...formData,
+        gohighlevel: {
+          ...formData.gohighlevel,
+          tags: formData.gohighlevel.tags.filter((tag) => tag !== tagToRemove),
+        },
+      });
     }
   };
 
@@ -180,8 +218,8 @@ export default function StoreIntegration() {
         <div className="flex items-center gap-3">
           <span className="text-2xl">💳</span>
           <p className="text-gray-900">
-            Enter your store details and payment information to generate a
-            custom payment link for your customers.
+            Configure your payment link with GoHighLevel integration for
+            seamless customer tracking.
           </p>
         </div>
       </div>
@@ -201,7 +239,7 @@ export default function StoreIntegration() {
           }
           onClick={() => setActiveTab("integration")}
         >
-          CRM Integration
+          GoHighLevel Integration
         </button>
       </div>
 
@@ -251,6 +289,25 @@ export default function StoreIntegration() {
                 Your USDT wallet address on the Polygon network where payments
                 will be sent
               </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="product_name"
+                className="block text-gray-900 mb-2 font-medium"
+              >
+                Product Name
+              </label>
+              <input
+                type="text"
+                id="product_name"
+                name="product_name"
+                value={formData.product_name}
+                required
+                className={baseInputClasses}
+                onChange={handleInputChange}
+                placeholder="e.g., Premium Course Access"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -353,21 +410,21 @@ export default function StoreIntegration() {
             <div className="flex items-center">
               <input
                 type="checkbox"
-                id="enable_crm"
-                name="enable_crm"
-                checked={formData.crm.enabled}
-                onChange={handleCrmToggle}
+                id="enable_ghl"
+                name="enable_ghl"
+                checked={formData.gohighlevel.enabled}
+                onChange={handleGHLToggle}
                 className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
               />
-              <label htmlFor="enable_crm" className="ml-2 text-gray-900">
-                Enable CRM Integration
+              <label htmlFor="enable_ghl" className="ml-2 text-gray-900">
+                Enable GoHighLevel Integration
               </label>
               <button
                 type="button"
                 onClick={() => setActiveTab("integration")}
                 className="ml-auto text-purple-600 text-sm"
               >
-                Configure CRM →
+                Configure Integration →
               </button>
             </div>
           </>
@@ -379,11 +436,12 @@ export default function StoreIntegration() {
               <div className="flex items-start gap-3">
                 <span className="text-yellow-600 text-xl">ℹ️</span>
                 <div>
-                  <p className="text-yellow-800 font-medium">CRM Integration</p>
+                  <p className="text-yellow-800 font-medium">
+                    GoHighLevel Integration
+                  </p>
                   <p className="text-yellow-700 text-sm mt-1">
-                    Connect your CRM system to automatically send customer data
-                    before and after payment. Customer details will be tagged
-                    differently for initiated vs. completed payments.
+                    Connect your GoHighLevel account to automatically track
+                    customer interactions and payment status.
                   </p>
                 </div>
               </div>
@@ -392,141 +450,105 @@ export default function StoreIntegration() {
             <div className="flex items-center mb-4">
               <input
                 type="checkbox"
-                id="crm_enabled"
-                name="crm.enabled"
-                checked={formData.crm.enabled}
-                onChange={handleCrmToggle}
+                id="ghl_enabled"
+                name="gohighlevel.enabled"
+                checked={formData.gohighlevel.enabled}
+                onChange={handleGHLToggle}
                 className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
               />
               <label
-                htmlFor="crm_enabled"
+                htmlFor="ghl_enabled"
                 className="ml-2 text-gray-900 font-medium"
               >
-                Enable CRM Integration
+                Enable GoHighLevel Integration
               </label>
             </div>
 
-            {formData.crm.enabled && (
+            {formData.gohighlevel.enabled && (
               <>
                 <div>
                   <label
-                    htmlFor="crm_provider"
+                    htmlFor="ghl_api_key"
                     className="block text-gray-900 mb-2 font-medium"
                   >
-                    CRM Provider
-                  </label>
-                  <select
-                    id="crm_provider"
-                    name="crm.provider"
-                    value={formData.crm.provider}
-                    required={formData.crm.enabled}
-                    className={baseSelectClasses}
-                    onChange={handleInputChange}
-                  >
-                    <option value="mailchimp">Mailchimp</option>
-                    <option value="sendy">Sendy</option>
-                    <option value="convertkit">ConvertKit</option>
-                    <option value="activecampaign">ActiveCampaign</option>
-                    <option value="hubspot">HubSpot</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="crm_api_key"
-                    className="block text-gray-900 mb-2 font-medium"
-                  >
-                    API Key
+                    GoHighLevel API Key
                   </label>
                   <input
                     type="password"
-                    id="crm_api_key"
-                    name="crm.apiKey"
-                    value={formData.crm.apiKey}
-                    required={formData.crm.enabled}
+                    id="ghl_api_key"
+                    name="gohighlevel.apiKey"
+                    value={formData.gohighlevel.apiKey}
+                    required={formData.gohighlevel.enabled}
                     className={baseInputClasses}
                     onChange={handleInputChange}
-                    placeholder="Your CRM API key"
+                    placeholder="Your GoHighLevel API key"
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    The API key for your CRM account (stored securely)
+                    Your GoHighLevel API key for contact management
                   </p>
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="crm_list_id"
-                    className="block text-gray-900 mb-2 font-medium"
-                  >
-                    List/Audience ID
+                  <label className="block text-gray-900 mb-2 font-medium">
+                    Contact Tags (up to 4)
                   </label>
-                  <input
-                    type="text"
-                    id="crm_list_id"
-                    name="crm.listId"
-                    value={formData.crm.listId}
-                    required={formData.crm.enabled}
-                    className={baseInputClasses}
-                    onChange={handleInputChange}
-                    placeholder="e.g., abc123def456"
-                  />
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {formData.gohighlevel.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className={`px-3 py-1 rounded-full text-sm flex items-center gap-1 ${
+                          tag === "not_paid" || tag === "paid"
+                            ? "bg-purple-100 text-purple-800"
+                            : "bg-blue-100 text-blue-800"
+                        }`}
+                      >
+                        {tag}
+                        {tag !== "not_paid" && tag !== "paid" && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTag(tag)}
+                            className="hover:text-red-600"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                  {formData.gohighlevel.tags.length < 4 && (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customTag}
+                        onChange={(e) => setCustomTag(e.target.value)}
+                        className={baseInputClasses}
+                        placeholder="Add custom tag"
+                        maxLength={30}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddTag}
+                        className="px-4 py-2 bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 transition-colors"
+                        disabled={!customTag.trim()}
+                      >
+                        Add Tag
+                      </button>
+                    </div>
+                  )}
                   <p className="text-sm text-gray-500 mt-1">
-                    The ID of the list or audience where contacts will be added
+                    Default tags (not_paid, paid) cannot be removed. Add up to 2
+                    custom tags.
                   </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label
-                      htmlFor="crm_tag_incomplete"
-                      className="block text-gray-900 mb-2 font-medium"
-                    >
-                      Initiated Payment Tag
-                    </label>
-                    <input
-                      type="text"
-                      id="crm_tag_incomplete"
-                      name="crm.tagIncomplete"
-                      value={formData.crm.tagIncomplete}
-                      className={baseInputClasses}
-                      onChange={handleInputChange}
-                      placeholder="payment_initiated"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Tag for started but incomplete payments
-                    </p>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="crm_tag_complete"
-                      className="block text-gray-900 mb-2 font-medium"
-                    >
-                      Completed Payment Tag
-                    </label>
-                    <input
-                      type="text"
-                      id="crm_tag_complete"
-                      name="crm.tagComplete"
-                      value={formData.crm.tagComplete}
-                      className={baseInputClasses}
-                      onChange={handleInputChange}
-                      placeholder="payment_completed"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Tag for successfully completed payments
-                    </p>
-                  </div>
                 </div>
 
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-blue-800 text-sm">
-                    <span className="font-medium">Data sent to CRM:</span> First
-                    name, last name, email, phone, address, payment amount,
-                    currency, and status. The customer will be tagged with{" "}
-                    {formData.crm.tagIncomplete} when they start the payment
-                    process and {formData.crm.tagComplete} when payment is
-                    confirmed.
+                    <span className="font-medium">
+                      Data sent to GoHighLevel:
+                    </span>{" "}
+                    Customer details, payment information, and status. Contacts
+                    will be tagged with {formData.gohighlevel.tags.join(", ")}{" "}
+                    based on their payment status.
                   </p>
                 </div>
               </>
@@ -573,7 +595,7 @@ export default function StoreIntegration() {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 />
               </svg>
-              Calculating...
+              Generating...
             </span>
           ) : (
             "Generate Payment Link"
@@ -637,22 +659,8 @@ export default function StoreIntegration() {
               rel="noopener noreferrer"
               className="flex-1 bg-blue-600 text-white text-center py-2 rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Preview Link
+              Visit Link
             </a>
-            <button
-              onClick={() => {
-                const testParams = new URLSearchParams(
-                  generatedLink.split("?")[1]
-                );
-                const testUrl = `${
-                  window.location.origin
-                }/test-payment?${testParams.toString()}`;
-                window.open(testUrl, "_blank");
-              }}
-              className="flex-1 bg-gray-700 text-white text-center py-2 rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              Test Payment Flow
-            </button>
           </div>
         </div>
       )}

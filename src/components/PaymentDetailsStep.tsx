@@ -31,7 +31,7 @@ interface PaymentDetailsStepProps {
 
 export const PaymentDetailsStep: React.FC<PaymentDetailsStepProps> = ({
   formData,
-  setFormData, // Might not need to pass setFormData down if handleInputChange is sufficient
+  setFormData,
   handleInputChange,
   countryCode,
   setCountryCode,
@@ -48,7 +48,7 @@ export const PaymentDetailsStep: React.FC<PaymentDetailsStepProps> = ({
   return (
     <div>
       <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-900 text-center">
-        Your Information
+        Payment Details
       </h2>
 
       {error && (

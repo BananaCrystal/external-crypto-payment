@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { PaymentFormProps, StoreDetails, FormData } from "@/types/paymentTypes";
 
 import { safeJsonParse } from "@/helpers/paymentHelpers";
+import { formatCurrency } from "@/helpers/paymentHelpers";
 
 import {
   PROCESSING_FEE_PERCENTAGE,
@@ -15,10 +16,43 @@ import {
   CRM_INTEGRATION_URL,
 } from "@/constants/paymentConstants";
 import { COUNTRY_CODES } from "@/constants/countries";
+import { sendToGoHighLevel } from "@/helpers/sendToGoHighLevel";
 
 import { BananaCrystalFooter } from "./BananaCrystalFooter";
 import { PaymentDetailsStep } from "./PaymentDetailsStep";
 import { PaymentCompleteStep } from "./PaymentCompleteStep";
+import DirectPayment from "./DirectPayment";
+
+// Add these animation classes to style section
+const animationStyles = `
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+.animate-fade-out {
+  animation: fadeOut 0.3s ease-out forwards;
+}
+`;
 
 export default function PaymentForm({
   storeId,
@@ -29,6 +63,8 @@ export default function PaymentForm({
   redirect_url,
   walletAddressFromParams,
   crmDetails,
+  gohighlevelApiKey,
+  productName,
 }: PaymentFormProps) {
   const STORE_API_URL = `${STORE_API_BASE_URL}/stores/${storeId}`;
   const PAYMENT_API_URL = `${PAYMENT_API_BASE_URL}/stores/${storeId}/external_store_payments`;
@@ -45,12 +81,17 @@ export default function PaymentForm({
   const [formData, setFormData] = useState<Omit<FormData, "wallet_address">>(
     () => {
       const savedFormData = safeJsonParse("paymentFormData");
+      if (savedFormData?.productName) {
+        // Remove productName from saved form data if it exists
+        delete savedFormData.productName;
+      }
 
       return {
         firstName: savedFormData?.firstName || "",
         lastName: savedFormData?.lastName || "",
         email: savedFormData?.email || "",
         phoneNumber: savedFormData?.phoneNumber || "",
+        tags: savedFormData?.tag || "incomplete",
         street: savedFormData?.street || "",
         city: savedFormData?.city || "",
         state: savedFormData?.state || "",
@@ -59,7 +100,7 @@ export default function PaymentForm({
         currency: savedFormData?.currency || initialCurrency,
         amount: savedFormData?.amount || initialAmount,
         usd_amount: savedFormData?.usd_amount || initialUsdAmount,
-        trxn_hash: savedFormData?.trxn_hash || "",
+        trxn_hash: savedFormData?.trxn_amount || "",
       };
     }
   );
@@ -141,6 +182,13 @@ export default function PaymentForm({
   const totalUsdAmountDue = useMemo(
     () => formData.usd_amount + processingFeeUsd,
     [formData.usd_amount, processingFeeUsd]
+  );
+
+  // New state for direct payment feature
+  const [showDirectPayment, setShowDirectPayment] = useState(true); // Enable by default
+  const [directPaymentProcessing, setDirectPaymentProcessing] = useState(false);
+  const [directPaymentError, setDirectPaymentError] = useState<string | null>(
+    null
   );
 
   // Effect to fetch store details
@@ -270,6 +318,43 @@ export default function PaymentForm({
     setStep(1);
   }, []);
 
+  // Modified function to send data to GoHighLevel with payment status
+  const sendToGHL = useCallback(
+    async (paymentStatus: "not paid" | "paid") => {
+      if (!gohighlevelApiKey) {
+        console.log("No GoHighLevel API key provided, skipping integration");
+        return;
+      }
+
+      if (!productName) {
+        console.error("Product name is required for GoHighLevel integration");
+        return;
+      }
+
+      try {
+        console.log(
+          `Sending data to GoHighLevel with status: ${paymentStatus}`
+        );
+        await sendToGoHighLevel(
+          formData,
+          countryCode,
+          paymentStatus,
+          gohighlevelApiKey,
+          productName
+        );
+        console.log(
+          `Contact sent to GoHighLevel successfully with ${paymentStatus} status and product tag.`
+        );
+      } catch (ghlError: any) {
+        console.error(
+          `Error sending contact to GoHighLevel with ${paymentStatus} status:`,
+          ghlError
+        );
+      }
+    },
+    [formData, countryCode, gohighlevelApiKey, productName]
+  );
+
   // Function to send data to CRM
   const sendToCRM = useCallback(
     async (status: "incomplete" | "complete") => {
@@ -375,6 +460,72 @@ export default function PaymentForm({
     }
   }, []);
 
+  // Handle transaction hash from direct payment
+  const handleDirectPaymentComplete = useCallback((hash: string) => {
+    console.log("Direct payment successful with hash:", hash);
+
+    // Update form data with the transaction hash
+    setFormData((prev) => {
+      const newFormData = {
+        ...prev,
+        trxn_hash: hash,
+      };
+
+      // Save to localStorage for persistence
+      if (typeof window !== "undefined") {
+        localStorage.setItem("paymentFormData", JSON.stringify(newFormData));
+      }
+
+      return newFormData;
+    });
+
+    // Automatically submit the form after getting the hash
+    const event = new Event("submit", { cancelable: true, bubbles: true });
+    // Need to defer slightly to ensure form state is updated
+    setTimeout(() => {
+      const form = document.querySelector("form");
+      if (form) {
+        form.dispatchEvent(event);
+      }
+    }, 500);
+
+    setDirectPaymentProcessing(false);
+  }, []);
+
+  const handleDirectPaymentStart = useCallback(() => {
+    setDirectPaymentProcessing(true);
+    setDirectPaymentError(null);
+  }, []);
+
+  const handleDirectPaymentError = useCallback((error: Error) => {
+    console.error("Direct payment error:", error);
+    setDirectPaymentError(error.message);
+    setDirectPaymentProcessing(false);
+  }, []);
+
+  // Add this new handler for wallet disconnection
+  const handleWalletDisconnected = useCallback(() => {
+    console.log("Wallet disconnected in PaymentForm");
+
+    // Clear any wallet-related state
+    if (typeof window !== "undefined") {
+      // Don't remove all payment form data, just the wallet-specific state
+      const savedFormData = safeJsonParse("paymentFormData");
+      if (savedFormData) {
+        // Remove any wallet-specific data but keep the form data
+        delete savedFormData.wallet_connected;
+        localStorage.setItem("paymentFormData", JSON.stringify(savedFormData));
+      }
+    }
+
+    // Set wallet disconnect flag
+    localStorage.setItem("walletManuallyDisconnected", "true");
+
+    // Reset direct payment states
+    setDirectPaymentProcessing(false);
+    setDirectPaymentError(null);
+  }, []);
+
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -392,9 +543,23 @@ export default function PaymentForm({
             !formData.city ||
             !formData.country
           ) {
-            setError("Please fill in all required contact and address fields.");
+            setError("Please fill in all required fields.");
             setLoading(false);
             return;
+          }
+
+          // Send data to GoHighLevel with "not paid" status
+          try {
+            await sendToGHL("not paid");
+            console.log(
+              "Contact sent to GoHighLevel with 'not paid' status successfully."
+            );
+          } catch (ghlError: any) {
+            // Log the error but continue with form submission
+            console.error(
+              "Error sending contact to GoHighLevel with 'not paid' status:",
+              ghlError
+            );
           }
 
           if (!canProceedToPayment) {
@@ -510,37 +675,41 @@ export default function PaymentForm({
 
         if (response.status >= 200 && response.status < 300) {
           console.log("Payment successful:", result || "No response body");
-          await sendToCRM("complete");
 
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("paymentStep");
-            localStorage.removeItem("paymentFormData");
-            localStorage.removeItem("paymentCountryCode");
-            localStorage.removeItem("paymentTimeLeft");
-            localStorage.removeItem("paymentTimerActive");
-            if (timerIntervalRef.current) {
-              clearInterval(timerIntervalRef.current);
-              timerIntervalRef.current = null;
-            }
+          // Send data to GoHighLevel with "paid" status after successful payment
+          try {
+            await sendToGHL("paid");
+            console.log(
+              "Contact sent to GoHighLevel with 'paid' status successfully."
+            );
+          } catch (ghlError: any) {
+            // Log the error but continue
+            console.error(
+              "Error sending contact to GoHighLevel with 'paid' status:",
+              ghlError
+            );
           }
 
-          const successMessage = document.createElement("div");
-          successMessage.className =
-            "fixed top-4 right-4 bg-green-50 text-green-800 p-4 rounded-lg shadow-lg z-50 animate-slide-in";
-          successMessage.innerHTML = `<div class="flex items-center gap-2"><span>✅</span><p>Payment verified successfully!</p></div>`;
-          document.body.appendChild(successMessage);
+          await sendToCRM("complete");
 
-          setTimeout(() => {
-            successMessage.classList.add("animate-slide-out");
-            setTimeout(() => {
-              successMessage.remove();
-              if (redirect_url) {
-                window.location.href = redirect_url;
-              } else {
-                console.log("Payment complete, no redirect URL provided.");
-              }
-            }, 300);
-          }, 3000);
+          // Clear all localStorage data
+          cleanupAllLocalStorage();
+
+          if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+          }
+
+          // Redirect to success page with redirect URL if available
+          const successUrl = new URL(
+            "/payment-success",
+            window.location.origin
+          );
+          if (redirect_url) {
+            successUrl.searchParams.set("redirect_url", redirect_url);
+          }
+          window.location.href = successUrl.toString();
+          return;
         } else {
           console.error("Payment API response error:", response.status, result);
           const errorMessage =
@@ -573,6 +742,8 @@ export default function PaymentForm({
         }, 7000);
       } finally {
         setLoading(false);
+        // Clear direct payment processing state if it was active
+        setDirectPaymentProcessing(false);
       }
     },
     [
@@ -590,7 +761,9 @@ export default function PaymentForm({
       initialCurrency,
       initialUsdAmount,
       canProceedToPayment,
-      totalUsdAmountDue, // This is correctly in the dependency array
+      totalUsdAmountDue,
+      sendToGHL,
+      processingFee,
     ]
   );
 
@@ -639,6 +812,54 @@ export default function PaymentForm({
   const baseButtonClasses = `w-full bg-[${brandPurple}] text-white py-3 sm:py-4 rounded-lg transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] hover:opacity-90 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none text-lg font-semibold`;
   const secondaryButtonClasses =
     "w-full bg-gray-200 text-gray-800 py-3 rounded-lg transition-all duration-300 hover:bg-gray-300 text-lg font-semibold";
+
+  // Add cleanup function to clear all data from localStorage
+  const cleanupAllLocalStorage = () => {
+    // Payment specific data
+    localStorage.removeItem("paymentStep");
+    localStorage.removeItem("paymentFormData");
+    localStorage.removeItem("paymentCountryCode");
+    localStorage.removeItem("paymentTimeLeft");
+    localStorage.removeItem("paymentTimerActive");
+
+    // Wallet related data
+    localStorage.removeItem("walletConnected");
+    localStorage.removeItem("walletManuallyDisconnected");
+    localStorage.removeItem("directPaymentData");
+
+    // Any other payment related data
+    localStorage.removeItem("lastPaymentHash");
+    localStorage.removeItem("pendingPayment");
+  };
+
+  // Add a function to remove wallet_address from URL
+  const removeWalletAddressFromUrl = () => {
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("wallet_address")) {
+        url.searchParams.delete("wallet_address");
+        window.history.replaceState({}, document.title, url.toString());
+      }
+    }
+  };
+
+  // Call this function early in the component lifecycle
+  useEffect(() => {
+    removeWalletAddressFromUrl();
+  }, []);
+
+  // Add this style tag to the document head when component mounts
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      const styleTag = document.createElement("style");
+      styleTag.innerHTML = animationStyles;
+      document.head.appendChild(styleTag);
+
+      return () => {
+        document.head.removeChild(styleTag);
+      };
+    }
+  }, []);
 
   // --- Loading/Error state before rendering the form ---
   if (storeLoading) {
@@ -738,36 +959,47 @@ export default function PaymentForm({
       >
         {/* Left Column: Store Information & Branding */}
         <div
-          className={`bg-[${brandPurple}] text-white p-6 sm:p-8 flex flex-col justify-between rounded-t-xl md:rounded-tr-none md:rounded-l-xl`}
+          className={`bg-[${brandPurple}] text-white p-6 sm:p-8 flex flex-col justify-between rounded-t-xl md:rounded-tr-none md:rounded-l-xl relative overflow-hidden`}
         >
-          <div>
-            <div className="mb-6 text-center">
-              {storeDetails?.store_logo ? (
-                <img
-                  src={storeDetails.store_logo}
-                  alt={`${storeDetails.name} logo`}
-                  className="mx-auto h-24 w-24 object-cover rounded-full border-4 border-white shadow-md"
-                />
-              ) : (
-                <div
-                  className={`mx-auto h-24 w-24 bg-purple-600 rounded-full flex items-center justify-center text-4xl font-bold text-white shadow-md`}
-                >
-                  {storeDetails?.name
-                    ? storeDetails.name.charAt(0).toUpperCase()
-                    : storeId.charAt(0).toUpperCase()}
-                </div>
+          {/* Background pattern for visual interest */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-purple-400"></div>
+            <div className="absolute -left-10 top-40 w-40 h-40 rounded-full bg-purple-400"></div>
+            <div className="absolute right-10 bottom-40 w-32 h-32 rounded-full bg-purple-400"></div>
+          </div>
+
+          <div className="relative z-10 flex-1 flex flex-col">
+            {/* Top Section */}
+            <div className="mb-8">
+              <div className="mb-6 text-center">
+                {storeDetails?.store_logo ? (
+                  <img
+                    src={storeDetails.store_logo}
+                    alt={`${storeDetails.name} logo`}
+                    className="mx-auto h-24 w-24 object-cover rounded-full border-4 border-white shadow-md"
+                  />
+                ) : (
+                  <div
+                    className={`mx-auto h-24 w-24 bg-purple-600 rounded-full flex items-center justify-center text-4xl font-bold text-white shadow-md`}
+                  >
+                    {storeDetails?.name
+                      ? storeDetails.name.charAt(0).toUpperCase()
+                      : storeId.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-center mb-2">
+                {storeDetails?.name || `Store ${storeId}`}
+              </h1>
+
+              {storeDetails?.store_username && (
+                <p className="text-purple-200 text-center text-lg sm:text-xl mb-4">
+                  @{storeDetails.store_username}
+                </p>
               )}
             </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-center mb-2">
-              {storeDetails?.name || `Store ${storeId}`}
-            </h1>
-           
 
-            {storeDetails?.store_username && (
-              <p className="text-purple-200 text-center text-lg sm:text-xl mb-6">
-                @{storeDetails.store_username}
-              </p>
-            )}
+            {/* Middle Section - Contact & Info */}
             <div className="bg-purple-600/30 rounded-lg p-4 mb-6 space-y-3">
               {storeDetails?.store_support_email && (
                 <div className="flex items-center text-purple-100 text-base">
@@ -813,11 +1045,161 @@ export default function PaymentForm({
                 </div>
               )}
             </div>
-            <div className="text-center text-purple-200 text-base italic mt-6">
-              {description}
+
+            {/* Transaction Description */}
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-semibold text-purple-100 mb-2">
+                Transaction Details
+              </h3>
+              <p className="text-purple-200 text-base italic">
+                {description || "Secure cryptocurrency payment"}
+              </p>
+              <div className="mt-3 bg-purple-600/20 rounded-lg p-3">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-purple-200">Amount:</span>
+                  <span className="font-bold text-white">
+                    {formatCurrency(formData.amount)} {formData.currency}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-purple-200">USDT:</span>
+                  <span className="font-bold text-white">
+                    ${formatCurrency(totalUsdAmountDue.toFixed(2))}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Instructions */}
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-purple-100 mb-3">
+                Payment Steps
+              </h3>
+              <ol className="space-y-2 text-purple-100 text-sm pl-1">
+                <li className="flex items-center">
+                  <span className="w-6 h-6 rounded-full bg-purple-500 flex-shrink-0 flex items-center justify-center mr-2 text-xs">
+                    1
+                  </span>
+                  <span>Connect your wallet or copy the payment address</span>
+                </li>
+                <li className="flex items-center">
+                  <span className="w-6 h-6 rounded-full bg-purple-500 flex-shrink-0 flex items-center justify-center mr-2 text-xs">
+                    2
+                  </span>
+                  <span>Send the exact USDT amount on Polygon network</span>
+                </li>
+                <li className="flex items-center">
+                  <span className="w-6 h-6 rounded-full bg-purple-500 flex-shrink-0 flex items-center justify-center mr-2 text-xs">
+                    3
+                  </span>
+                  <span>Submit the transaction hash to confirm</span>
+                </li>
+              </ol>
+            </div>
+
+            {/* Network Information */}
+            <div className="bg-purple-600/30 rounded-lg p-4 mb-6">
+              <h3 className="text-lg font-semibold text-purple-100 mb-2 flex items-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                Important Network Information
+              </h3>
+              <div className="pl-7 text-sm text-purple-200 space-y-2">
+                <p>
+                  <span className="text-white font-medium">Network:</span>{" "}
+                  Polygon/MATIC only
+                </p>
+                <p>
+                  <span className="text-white font-medium">Token:</span> USDT
+                  (Tether)
+                </p>
+                <p>
+                  <span className="text-white font-medium">Gas Fees:</span>{" "}
+                  Typically under $0.01
+                </p>
+              </div>
+            </div>
+
+            {/* FAQ Section */}
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-purple-100 mb-3">
+                FAQ
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <h4 className="text-white font-medium text-sm">
+                    How long do transactions take?
+                  </h4>
+                  <p className="text-purple-200 text-xs">
+                    Polygon transactions usually confirm within 1-2 minutes.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-white font-medium text-sm">
+                    What if I send from wrong network?
+                  </h4>
+                  <p className="text-purple-200 text-xs">
+                    Funds sent on other networks may be lost and unrecoverable.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-white font-medium text-sm">
+                    Need help with your payment?
+                  </h4>
+                  <p className="text-purple-200 text-xs">
+                    Contact support with your transaction hash for assistance.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Security Notice */}
+            <div className="bg-purple-600/30 rounded-lg p-4 mb-6">
+              <div className="flex items-start">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6 mr-2 text-purple-200 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                  />
+                </svg>
+                <div>
+                  <h4 className="font-semibold text-purple-100 mb-1">
+                    Secure Payment
+                  </h4>
+                  <p className="text-purple-200 text-sm">
+                    This transaction is secured using blockchain technology.
+                    Please ensure you're using the Polygon/MATIC network for
+                    fast and secure payments.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-          <BananaCrystalFooter />
+
+          {/* Footer Section */}
+          <div className="relative z-10 mt-auto">
+            <BananaCrystalFooter />
+          </div>
         </div>
 
         {/* Right Column: Form Steps */}
@@ -825,42 +1207,89 @@ export default function PaymentForm({
           {step === 1 && (
             <PaymentDetailsStep
               formData={formData}
-              setFormData={setFormData} // Pass setFormData down (handlers should save to localStorage)
-              handleInputChange={handleInputChange} // Updated to save to localStorage
+              setFormData={setFormData}
+              handleInputChange={handleInputChange}
               countryCode={countryCode}
-              setCountryCode={setCountryCode} // Consider if countryCode needs localStorage save here or only in main effect
-              handleSubmit={handleSubmit} // Updated to set loading state
+              setCountryCode={setCountryCode}
+              handleSubmit={handleSubmit}
               loading={loading}
               error={error}
               canProceedToPayment={canProceedToPayment}
               totalAmountDue={totalAmountDue}
               totalUsdAmountDue={totalUsdAmountDue}
               processingFee={processingFee}
-              storeError={storeError} // Pass storeError down for potential display
-              effectiveWalletAddress={effectiveWalletAddress} // Pass effective address down
+              storeError={storeError}
+              effectiveWalletAddress={effectiveWalletAddress}
             />
           )}
 
           {step === 2 && (
-            <PaymentCompleteStep
-              formData={formData}
-              handleInputChange={handleInputChange} // Updated to save to localStorage
-              handleSubmit={handleSubmit} // Updated to set loading state
-              loading={loading}
-              error={error}
-              effectiveWalletAddress={effectiveWalletAddress} // Pass effective address down
-              totalAmountDue={totalAmountDue}
-              totalUsdAmountDue={totalUsdAmountDue}
-              processingFee={processingFee}
-              processingFeeUsd={processingFeeUsd}
-              timerActive={timerActive}
-              timeLeft={timeLeft}
-              handleMoreTime={handleMoreTime} // Updated to save state on click
-              copyToClipboard={copyToClipboard}
-              handlePasteTransactionHash={handlePasteTransactionHash} // Updated to save to localStorage
-              resetSession={resetSession} // Updated to potentially reset state instead of reload
-              storeError={storeError} // Pass storeError down
-            />
+            <>
+              {/* Add Direct Payment Component */}
+              {showDirectPayment && (
+                <DirectPayment
+                  recipientAddress={effectiveWalletAddress || ""}
+                  amountUsd={totalUsdAmountDue}
+                  onPaymentComplete={handleDirectPaymentComplete}
+                  onPaymentStart={handleDirectPaymentStart}
+                  onPaymentError={handleDirectPaymentError}
+                  onWalletDisconnect={handleWalletDisconnected}
+                  disabled={loading || !timerActive}
+                  timerActive={timerActive}
+                  timeLeft={timeLeft}
+                  handleMoreTime={handleMoreTime}
+                />
+              )}
+
+              {/* Show the direct payment error if there is one */}
+              {directPaymentError && (
+                <div className="bg-red-50 rounded-lg p-4 mb-4 animate-shake">
+                  <p className="text-red-800 text-sm flex items-center gap-2">
+                    <span>⚠️</span> {directPaymentError}
+                  </p>
+                </div>
+              )}
+
+              {/* Separator between payment methods */}
+              <div className="relative my-8">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-white px-4 text-sm text-gray-500">
+                    OR
+                  </span>
+                </div>
+              </div>
+
+              {/* Manual payment option title */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Option 2: Manual Payment
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Make a payment manually using your wallet app and paste the
+                  transaction hash below.
+                </p>
+              </div>
+
+              <PaymentCompleteStep
+                formData={formData}
+                handleInputChange={handleInputChange}
+                handleSubmit={handleSubmit}
+                loading={loading || directPaymentProcessing}
+                error={error}
+                effectiveWalletAddress={effectiveWalletAddress}
+                totalAmountDue={totalAmountDue}
+                totalUsdAmountDue={totalUsdAmountDue}
+                processingFee={processingFee}
+                processingFeeUsd={processingFeeUsd}
+                copyToClipboard={copyToClipboard}
+                handlePasteTransactionHash={handlePasteTransactionHash}
+                resetSession={resetSession}
+                storeError={storeError}
+              />
+            </>
           )}
         </div>
       </div>

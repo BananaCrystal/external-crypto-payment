@@ -6,3 +6,6 @@ export const PAYMENT_API_BASE_URL = "https://app.bananacrystal.com/api/v1"; // B
 export const USER_SIGNUP_URL =
   "https://app.bananacrystal.com/api/users/sign_up";
 export const CRM_INTEGRATION_URL = "/api/crm-integration";
+
+export const GOHIGHLEVEL_FORM_ID = "24TwPFCDpYxTgCDaDjmy";
+export const GOHIGHLEVEL_API_URL = "https://api.leadconnectorhq.com/widgets/forms/submit";
