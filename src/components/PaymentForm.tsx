@@ -63,6 +63,8 @@ export default function PaymentForm({
   redirect_url,
   walletAddressFromParams,
   crmDetails,
+  gohighlevelApiKey,
+  productName,
 }: PaymentFormProps) {
   const STORE_API_URL = `${STORE_API_BASE_URL}/stores/${storeId}`;
   const PAYMENT_API_URL = `${PAYMENT_API_BASE_URL}/stores/${storeId}/external_store_payments`;
@@ -79,6 +81,10 @@ export default function PaymentForm({
   const [formData, setFormData] = useState<Omit<FormData, "wallet_address">>(
     () => {
       const savedFormData = safeJsonParse("paymentFormData");
+      if (savedFormData?.productName) {
+        // Remove productName from saved form data if it exists
+        delete savedFormData.productName;
+      }
 
       return {
         firstName: savedFormData?.firstName || "",
@@ -94,7 +100,7 @@ export default function PaymentForm({
         currency: savedFormData?.currency || initialCurrency,
         amount: savedFormData?.amount || initialAmount,
         usd_amount: savedFormData?.usd_amount || initialUsdAmount,
-        trxn_hash: savedFormData?.trxn_hash || "",
+        trxn_hash: savedFormData?.trxn_amount || "",
       };
     }
   );
@@ -315,13 +321,29 @@ export default function PaymentForm({
   // Modified function to send data to GoHighLevel with payment status
   const sendToGHL = useCallback(
     async (paymentStatus: "not paid" | "paid") => {
+      if (!gohighlevelApiKey) {
+        console.log("No GoHighLevel API key provided, skipping integration");
+        return;
+      }
+
+      if (!productName) {
+        console.error("Product name is required for GoHighLevel integration");
+        return;
+      }
+
       try {
         console.log(
           `Sending data to GoHighLevel with status: ${paymentStatus}`
         );
-        await sendToGoHighLevel(formData, countryCode, paymentStatus);
+        await sendToGoHighLevel(
+          formData,
+          countryCode,
+          paymentStatus,
+          gohighlevelApiKey,
+          productName
+        );
         console.log(
-          `Contact sent to GoHighLevel successfully with ${paymentStatus} status.`
+          `Contact sent to GoHighLevel successfully with ${paymentStatus} status and product tag.`
         );
       } catch (ghlError: any) {
         console.error(
@@ -330,7 +352,7 @@ export default function PaymentForm({
         );
       }
     },
-    [formData, countryCode]
+    [formData, countryCode, gohighlevelApiKey, productName]
   );
 
   // Function to send data to CRM
@@ -521,7 +543,7 @@ export default function PaymentForm({
             !formData.city ||
             !formData.country
           ) {
-            setError("Please fill in all required contact and address fields.");
+            setError("Please fill in all required fields.");
             setLoading(false);
             return;
           }
@@ -678,73 +700,16 @@ export default function PaymentForm({
             timerIntervalRef.current = null;
           }
 
-          // Create a nicer success modal instead of just a toast
-          const successModal = document.createElement("div");
-          successModal.className =
-            "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50";
-          successModal.id = "payment-success-modal";
-
-          const txnHash = formData.trxn_hash;
-          const txnHashShort = txnHash
-            ? `${txnHash.substring(0, 6)}...${txnHash.substring(
-                txnHash.length - 6
-              )}`
-            : "";
-          const amountDisplay = formatCurrency(totalUsdAmountDue.toFixed(2));
-
-          successModal.innerHTML = `
-            <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md mx-4 animate-fade-in-up">
-              <div class="text-center">
-                <div class="mx-auto mb-4 bg-green-100 rounded-full h-20 w-20 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h2 class="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
-                <p class="text-gray-600 mb-6">Your payment of <span class="font-bold text-gray-800">$${amountDisplay} USDT</span> has been confirmed.</p>
-                
-                <div class="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-                  <div class="flex justify-between items-center mb-2">
-                    <span class="text-gray-500">Amount:</span>
-                    <span class="font-medium text-gray-900">$${amountDisplay} USDT</span>
-                  </div>
-                  <div class="flex justify-between items-center mb-2">
-                    <span class="text-gray-500">Transaction:</span>
-                    <span class="font-mono text-sm text-gray-900 font-bold">${txnHashShort}</span>
-                  </div>
-                  <div class="flex justify-between items-center">
-                    <span class="text-gray-500">Status:</span>
-                    <span class="text-green-600 font-medium">Confirmed</span>
-                  </div>
-                </div>
-                
-                <button id="success-continue-btn" class="w-full bg-[#4c3f84] text-white py-3 rounded-lg hover:bg-opacity-90 transition-all duration-300">
-                  Continue
-                </button>
-              </div>
-            </div>
-          `;
-
-          document.body.appendChild(successModal);
-
-          // Add click handler to the continue button - force page refresh ONLY when clicked
-          setTimeout(() => {
-            const continueBtn = document.getElementById("success-continue-btn");
-            if (continueBtn) {
-              continueBtn.addEventListener("click", () => {
-                successModal.classList.add("animate-fade-out");
-                setTimeout(() => {
-                  successModal.remove();
-                  if (redirect_url) {
-                    window.location.href = redirect_url;
-                  } else {
-                    // If no redirect URL, just refresh the page
-                    window.location.reload();
-                  }
-                }, 300);
-              });
-            }
-          }, 100);
+          // Redirect to success page with redirect URL if available
+          const successUrl = new URL(
+            "/payment-success",
+            window.location.origin
+          );
+          if (redirect_url) {
+            successUrl.searchParams.set("redirect_url", redirect_url);
+          }
+          window.location.href = successUrl.toString();
+          return;
         } else {
           console.error("Payment API response error:", response.status, result);
           const errorMessage =
@@ -1270,6 +1235,9 @@ export default function PaymentForm({
                   onPaymentError={handleDirectPaymentError}
                   onWalletDisconnect={handleWalletDisconnected}
                   disabled={loading || !timerActive}
+                  timerActive={timerActive}
+                  timeLeft={timeLeft}
+                  handleMoreTime={handleMoreTime}
                 />
               )}
 
@@ -1316,9 +1284,6 @@ export default function PaymentForm({
                 totalUsdAmountDue={totalUsdAmountDue}
                 processingFee={processingFee}
                 processingFeeUsd={processingFeeUsd}
-                timerActive={timerActive}
-                timeLeft={timeLeft}
-                handleMoreTime={handleMoreTime}
                 copyToClipboard={copyToClipboard}
                 handlePasteTransactionHash={handlePasteTransactionHash}
                 resetSession={resetSession}

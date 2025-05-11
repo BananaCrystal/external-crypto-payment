@@ -28,6 +28,8 @@ export interface PaymentFormProps {
   walletAddressFromParams?: string;
   wallet_address?: string;
   crmDetails?: CrmDetails;
+  gohighlevelApiKey?: string;
+  productName?: string;
 }
 
 export interface FormData {

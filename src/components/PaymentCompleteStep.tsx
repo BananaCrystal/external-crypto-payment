@@ -7,26 +7,32 @@ import {
   baseButtonClasses,
   secondaryButtonClasses,
 } from "@/styles/paymentStyles";
+import CryptoJS from "crypto-js";
 
 interface PaymentCompleteStepProps {
   formData: Omit<FormData, "wallet_address">;
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleSubmit: (e: React.FormEvent) => Promise<void>; // Pass the submit handler down
+  handleSubmit: (e: React.FormEvent) => Promise<void>;
   loading: boolean;
   error: string | null;
-  effectiveWalletAddress: string | null | undefined; // The wallet address to display and use
-  totalAmountDue: number; // Calculated fees
-  totalUsdAmountDue: number; // Calculated fees
-  processingFee: number; // Calculated fee amount
-  processingFeeUsd: number; // Calculated fee amount in USD
-  timerActive: boolean;
-  timeLeft: number;
-  handleMoreTime: () => void;
-  copyToClipboard: (text: string | null | undefined) => void; // Pass copy handler down
-  handlePasteTransactionHash: () => Promise<void>; // Pass paste handler down
-  resetSession: () => void; // Pass reset handler down
-  storeError: string | null; // Store API fetch error (for warning message)
+  effectiveWalletAddress: string | null | undefined;
+  totalAmountDue: number;
+  totalUsdAmountDue: number;
+  processingFee: number;
+  processingFeeUsd: number;
+  copyToClipboard: (text: string | null | undefined) => void;
+  handlePasteTransactionHash: () => Promise<void>;
+  resetSession: () => void;
+  storeError: string | null;
 }
+
+// Add decryption utility
+const decryptApiKey = (encryptedKey: string): string => {
+  const ENCRYPTION_KEY =
+    process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "your-fallback-encryption-key";
+  const bytes = CryptoJS.AES.decrypt(encryptedKey, ENCRYPTION_KEY);
+  return bytes.toString(CryptoJS.enc.Utf8);
+};
 
 export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
   formData,
@@ -39,9 +45,6 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
   totalUsdAmountDue,
   processingFee,
   processingFeeUsd,
-  timerActive,
-  timeLeft,
-  handleMoreTime,
   copyToClipboard,
   handlePasteTransactionHash,
   resetSession,
@@ -92,14 +95,12 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
         </div>
       </div>
 
-      {/* Wallet Address Section - Using effectiveWalletAddress */}
+      {/* Wallet Address Section */}
       <div className="bg-gray-100 rounded-2xl p-6 sm:p-8 border border-gray-200 text-gray-900 shadow-inner mb-6">
-        {/* Wallet Address Display - Using effectiveWalletAddress */}
         <div className="flex justify-between items-center mb-4">
           <span className="font-bold text-lg sm:text-xl text-gray-800">
             Send Payment To This Address
           </span>
-          {/* Copy to Clipboard Button */}
           <button
             type="button"
             onClick={() => copyToClipboard(effectiveWalletAddress)}
@@ -134,7 +135,7 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
           Polygon/MATIC Network Only
         </p>
 
-        {/* USDT Amount to Pay - Shows total including fee */}
+        {/* USDT Amount to Pay */}
         <div className={`bg-[#4c3f84] rounded-lg p-4 sm:p-5 mt-4 text-white`}>
           <div className="text-center">
             <div className="font-medium mb-1 text-purple-200">
@@ -149,15 +150,6 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
 
       {/* Form for Step 2 */}
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-        {/* Timer Display */}
-        <div
-          className={`text-center text-xl font-bold ${
-            timerActive ? "text-gray-800" : "text-red-600"
-          }`}
-        >
-          Time Remaining: {formatTime(timeLeft)}
-        </div>
-
         {/* Transaction Hash Input with Paste Button */}
         <div>
           <label
@@ -176,7 +168,7 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
               value={formData.trxn_hash}
               onChange={handleInputChange}
               placeholder="0x..."
-              disabled={loading || !effectiveWalletAddress || !timerActive}
+              disabled={loading || !effectiveWalletAddress}
             />
             {/* Paste Button */}
             {typeof navigator !== "undefined" && navigator.clipboard && (
@@ -184,10 +176,9 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
                 type="button"
                 onClick={handlePasteTransactionHash}
                 className={`absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}
-                disabled={loading || !effectiveWalletAddress || !timerActive}
+                disabled={loading || !effectiveWalletAddress}
                 title="Paste Transaction Hash"
               >
-                {/* Paste Icon */}
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-5 w-5"
@@ -210,12 +201,7 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
           <button
             type="submit"
             className={baseButtonClasses}
-            disabled={
-              loading ||
-              !formData.trxn_hash ||
-              !effectiveWalletAddress ||
-              !timerActive
-            }
+            disabled={loading || !formData.trxn_hash || !effectiveWalletAddress}
           >
             {loading ? (
               <div className="flex items-center justify-center">
@@ -246,25 +232,14 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
             )}
           </button>
 
-          {!timerActive ? (
-            <button
-              type="button"
-              onClick={handleMoreTime}
-              className={baseButtonClasses}
-              disabled={loading}
-            >
-              Request More Time
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={resetSession}
-              className={secondaryButtonClasses}
-              disabled={loading}
-            >
-              Cancel & Start Over
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={resetSession}
+            className={secondaryButtonClasses}
+            disabled={loading}
+          >
+            Cancel & Start Over
+          </button>
         </div>
       </form>
     </div>

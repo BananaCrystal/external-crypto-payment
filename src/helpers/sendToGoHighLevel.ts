@@ -1,15 +1,42 @@
+import CryptoJS from "crypto-js";
+
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
+
+// Add decryption utility
+const decryptApiKey = (encryptedKey: string): string => {
+  const ENCRYPTION_KEY =
+    process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "your-fallback-encryption-key";
+  const bytes = CryptoJS.AES.decrypt(encryptedKey, ENCRYPTION_KEY);
+  return bytes.toString(CryptoJS.enc.Utf8);
+};
 
 export const sendToGoHighLevel = async (
   formData: any,
   countryCode: string,
-  paymentStatus: string
+  paymentStatus: string,
+  encryptedApiKey: string,
+  productName?: string // Change description to productName
 ) => {
   let retries = 0;
 
   const attemptSend = async () => {
     try {
+      // Decrypt the API key
+      const apiKey = decryptApiKey(encryptedApiKey);
+
+      // Create tags array with payment status and product name
+      const tags = [paymentStatus];
+      if (productName) {
+        // Clean and format the product name for use as a tag
+        const productTag = productName
+          .replace(/[^a-zA-Z0-9\s-]/g, "") // Remove special characters
+          .trim()
+          .replace(/\s+/g, "-") // Replace spaces with hyphens
+          .toLowerCase();
+        tags.push(productTag);
+      }
+
       const payload = {
         email: formData.email,
         name: `${formData.firstName} ${formData.lastName}`,
@@ -19,11 +46,12 @@ export const sendToGoHighLevel = async (
         state: formData.state,
         postalCode: formData.postalCode,
         country: formData.country,
-        tags: paymentStatus,
+        tags: tags.join(","), // Join tags with comma
         customField: {
           trxn_hash: formData.trxn_hash || "",
           wallet_address: formData.wallet_address || "",
           payment_status: formData.payment_status || "incomplete",
+          product_name: productName || "", // Add product name to custom fields
         },
       };
 
@@ -33,12 +61,13 @@ export const sendToGoHighLevel = async (
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer `,
+            Authorization: `Bearer ${apiKey}`, // Use the decrypted API key
           },
           body: JSON.stringify(payload),
         }
       );
 
+  
       // Handle rate limiting (429 Too Many Requests)
       if (response.status === 429) {
         // Rate limit hit - wait and retry if under max retries
