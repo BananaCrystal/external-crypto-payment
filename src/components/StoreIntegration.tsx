@@ -250,8 +250,8 @@ export default function StoreIntegration() {
                 <span className="ml-2 text-gray-500 cursor-help group relative inline-block">
                   ℹ️
                   <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
-                    Your store ID can be found in your BananaCrystal Store Integration settings
-                    under widget integration.
+                    Your store ID can be found in your BananaCrystal Store
+                    Integration settings under widget integration.
                   </span>
                 </span>
               </label>
