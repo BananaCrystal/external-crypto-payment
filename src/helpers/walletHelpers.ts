@@ -1,5 +1,15 @@
 import { ethers } from "ethers";
 
+// Define types for contract addresses
+type NetworkId = typeof POLYGON_CHAIN_ID | typeof POLYGON_TESTNET_CHAIN_ID;
+type TokenType = "USDT";
+
+interface ContractAddresses {
+  [key: number]: {
+    [key in TokenType]: string;
+  };
+}
+
 // Interface for wallet connection state
 interface WalletState {
   address: string | null;
@@ -14,8 +24,8 @@ export const POLYGON_CHAIN_ID = 137;
 export const POLYGON_TESTNET_CHAIN_ID = 80001; // Mumbai testnet
 export const POLYGON_MUMBAI_CHAIN_ID = 80001;
 
-// Token contract addresses per network
-export const CONTRACT_ADDRESSES = {
+// Token contract addresses per network with proper typing
+export const CONTRACT_ADDRESSES: ContractAddresses = {
   // Polygon Mainnet
   [POLYGON_CHAIN_ID]: {
     USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
@@ -24,12 +34,16 @@ export const CONTRACT_ADDRESSES = {
   [POLYGON_TESTNET_CHAIN_ID]: {
     USDT: "0x3813e82e6f7098b9583FC0F33a962D02018B6803", // Mumbai USDT - if you're on testnet
   },
-};
+} as const;
 
 // Default to mainnet if network not supported
-export const getContractAddress = (chainId: number, token: string) => {
-  if (CONTRACT_ADDRESSES[chainId] && CONTRACT_ADDRESSES[chainId][token]) {
-    return CONTRACT_ADDRESSES[chainId][token];
+export const getContractAddress = (
+  chainId: number,
+  token: TokenType
+): string => {
+  const networkContracts = CONTRACT_ADDRESSES[chainId as NetworkId];
+  if (networkContracts && token in networkContracts) {
+    return networkContracts[token];
   }
   console.warn(
     `No contract address for ${token} on chain ID ${chainId}, falling back to Polygon Mainnet`
@@ -48,6 +62,22 @@ export const USDT_ABI = [
 
 // USDT contract address on Polygon - use this as a fallback
 export const USDT_CONTRACT_ADDRESS = CONTRACT_ADDRESSES[POLYGON_CHAIN_ID].USDT;
+
+// Add type for Ethereum error
+interface EthereumError extends Error {
+  code?: string;
+  message: string;
+}
+
+// Add type guard function
+const isEthereumError = (error: unknown): error is EthereumError => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as EthereumError).message === "string"
+  );
+};
 
 /**
  * Connect to MetaMask or other Web3 provider
@@ -143,10 +173,14 @@ export const sendUsdtPayment = async (
     let chainId = POLYGON_CHAIN_ID; // Default to Polygon Mainnet
 
     try {
-      const network = await signer.provider.getNetwork();
+      const provider = signer.provider;
+      if (!provider) {
+        throw new Error("No provider available");
+      }
+      const network = await provider.getNetwork();
       chainId = Number(network.chainId);
       console.log(`Connected to network with chain ID: ${chainId}`);
-    } catch (networkError) {
+    } catch (networkError: unknown) {
       console.warn(
         "Failed to get network, defaulting to Polygon Mainnet:",
         networkError
@@ -181,23 +215,27 @@ export const sendUsdtPayment = async (
       hash: receipt.hash,
       success: true,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to send USDT payment:", error);
 
     // Try to provide more helpful error messages
-    if (error.message && error.message.includes("insufficient funds")) {
-      throw new Error(
-        "Insufficient funds to complete the transaction. Please check your USDT balance."
-      );
+    if (isEthereumError(error)) {
+      if (error.message.includes("insufficient funds")) {
+        throw new Error(
+          "Insufficient funds to complete the transaction. Please check your USDT balance."
+        );
+      }
+
+      if (error.message.includes("user rejected")) {
+        throw new Error(
+          "Transaction was rejected. Please try again and confirm the transaction in your wallet."
+        );
+      }
     }
 
-    if (error.message && error.message.includes("user rejected")) {
-      throw new Error(
-        "Transaction was rejected. Please try again and confirm the transaction in your wallet."
-      );
-    }
-
-    throw error;
+    throw error instanceof Error
+      ? error
+      : new Error("Unknown payment error occurred");
   }
 };
 
@@ -267,11 +305,11 @@ export const getUsdtBalance = async (
       try {
         balance = await contract.balanceOf(address);
         console.log(`Raw balance: ${balance.toString()}`);
-      } catch (balanceError) {
+      } catch (balanceError: unknown) {
         console.error("Failed to get token balance:", balanceError);
 
         if (
-          balanceError.message &&
+          isEthereumError(balanceError) &&
           balanceError.message.includes("call exception")
         ) {
           throw new Error(
@@ -310,11 +348,11 @@ export const getUsdtBalance = async (
         "Could not check USDT balance. Please verify your connection."
       );
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to get USDT balance:", error);
 
     // Convert technical error messages to user-friendly ones
-    if (error.message) {
+    if (isEthereumError(error)) {
       if (
         error.message.includes("network") ||
         error.message.includes("chain")

@@ -22,7 +22,6 @@ const decryptApiKey = (encryptedKey: string): string => {
 
 interface StoreDetails {
   store_id: string;
-  wallet_address: string;
   amount: string;
   currency: string;
   description: string;
@@ -46,7 +45,6 @@ interface Rate {
 export default function StoreIntegration() {
   const [formData, setFormData] = useState<StoreDetails>({
     store_id: "",
-    wallet_address: "",
     amount: "",
     currency: "NGN",
     description: "",
@@ -120,20 +118,17 @@ export default function StoreIntegration() {
       product_name: formData.product_name,
       redirect_url: formData.redirect_url,
       usd_amount: usdAmount.toFixed(2),
-      wallet_address: formData.wallet_address,
       countdown_minutes: formData.countdown_minutes.toString(),
     });
 
     // Add GoHighLevel details if enabled
     if (formData.gohighlevel.enabled) {
       params.append("gohighlevel_enabled", "true");
-      // Encrypt the API key before adding to URL
       const encryptedApiKey = encryptApiKey(formData.gohighlevel.apiKey);
       params.append("gohighlevel_api_key", encryptedApiKey);
-      params.append(
-        "gohighlevel_tags",
-        JSON.stringify(formData.gohighlevel.tags)
-      );
+      // Include product_name in tags
+      const tags = [...formData.gohighlevel.tags, formData.product_name];
+      params.append("gohighlevel_tags", JSON.stringify(tags));
     }
 
     const link = `${baseUrl}/pay?${params.toString()}`;
@@ -175,7 +170,7 @@ export default function StoreIntegration() {
   };
 
   const handleAddTag = () => {
-    if (customTag && formData.gohighlevel.tags.length < 4) {
+    if (customTag && formData.gohighlevel.tags.length < 5) {
       setFormData({
         ...formData,
         gohighlevel: {
@@ -246,12 +241,19 @@ export default function StoreIntegration() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {activeTab === "payment" && (
           <>
-            <div>
+            <div className="relative">
               <label
                 htmlFor="store_id"
                 className="block text-gray-900 mb-2 font-medium"
               >
                 Store ID
+                <span className="ml-2 text-gray-500 cursor-help group relative inline-block">
+                  ℹ️
+                  <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
+                    Your store ID can be found in your Banana Crystal dashboard
+                    under Store Settings
+                  </span>
+                </span>
               </label>
               <input
                 type="text"
@@ -265,29 +267,6 @@ export default function StoreIntegration() {
               />
               <p className="text-sm text-gray-500 mt-1">
                 Your unique store identifier
-              </p>
-            </div>
-
-            <div>
-              <label
-                htmlFor="wallet_address"
-                className="block text-gray-900 mb-2 font-medium"
-              >
-                Store USDT Wallet Address (Polygon)
-              </label>
-              <input
-                type="text"
-                id="wallet_address"
-                name="wallet_address"
-                value={formData.wallet_address}
-                required
-                className={baseInputClasses}
-                onChange={handleInputChange}
-                placeholder="0x..."
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Your USDT wallet address on the Polygon network where payments
-                will be sent
               </p>
             </div>
 
@@ -466,12 +445,19 @@ export default function StoreIntegration() {
 
             {formData.gohighlevel.enabled && (
               <>
-                <div>
+                <div className="relative">
                   <label
                     htmlFor="ghl_api_key"
                     className="block text-gray-900 mb-2 font-medium"
                   >
                     GoHighLevel API Key
+                    <span className="ml-2 text-gray-500 cursor-help group relative inline-block">
+                      ℹ️
+                      <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
+                        Find your API key in GoHighLevel under Settings &gt;
+                        Integrations &gt; API Keys
+                      </span>
+                    </span>
                   </label>
                   <input
                     type="password"
@@ -490,7 +476,7 @@ export default function StoreIntegration() {
 
                 <div>
                   <label className="block text-gray-900 mb-2 font-medium">
-                    Contact Tags (up to 4)
+                    Contact Tags (up to 5)
                   </label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {formData.gohighlevel.tags.map((tag) => (
@@ -515,7 +501,7 @@ export default function StoreIntegration() {
                       </span>
                     ))}
                   </div>
-                  {formData.gohighlevel.tags.length < 4 && (
+                  {formData.gohighlevel.tags.length < 5 && (
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -536,8 +522,8 @@ export default function StoreIntegration() {
                     </div>
                   )}
                   <p className="text-sm text-gray-500 mt-1">
-                    Default tags (not_paid, paid) cannot be removed. Add up to 2
-                    custom tags.
+                    Default tags (not_paid, paid) and product name will be
+                    automatically added. You can add up to 3 custom tags.
                   </p>
                 </div>
 

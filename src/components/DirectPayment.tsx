@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ethers } from "ethers";
 import { sendUsdtPayment, getUsdtBalance } from "@/helpers/walletHelpers";
 import WalletConnect from "./WalletConnect";
 
@@ -17,6 +18,22 @@ interface DirectPaymentProps {
   handleMoreTime: () => void;
 }
 
+// Add type for Ethereum error
+interface EthereumError extends Error {
+  code?: string;
+  message: string;
+}
+
+// Add type guard function
+const isEthereumError = (error: unknown): error is EthereumError => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as EthereumError).message === "string"
+  );
+};
+
 const DirectPayment: React.FC<DirectPaymentProps> = ({
   recipientAddress,
   amountUsd,
@@ -31,7 +48,7 @@ const DirectPayment: React.FC<DirectPaymentProps> = ({
 }) => {
   const [connected, setConnected] = useState(false);
   const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
-  const [signer, setSigner] = useState<any>(null);
+  const [signer, setSigner] = useState<ethers.Signer | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
@@ -50,7 +67,7 @@ const DirectPayment: React.FC<DirectPaymentProps> = ({
     let loadingTimer: NodeJS.Timeout | null = null;
 
     const fetchBalance = async () => {
-      if (connected && signer && connectedAddress) {
+      if (connected && signer?.provider && connectedAddress) {
         try {
           // Start with loading state and ensure it stays for at least 1 second to avoid flickering
           setBalance("Loading...");
@@ -63,18 +80,16 @@ const DirectPayment: React.FC<DirectPaymentProps> = ({
               signer.provider,
               connectedAddress
             );
-          } catch (err) {
+          } catch (err: unknown) {
             console.error("Failed to fetch balance:", err);
 
-            // Don't show technical errors to the user, just a friendly message
             if (mounted) {
-              // No need to show error if component is unmounted
               setError(
                 "Could not check USDT balance. Please verify you're connected to the Polygon network."
               );
               setBalance("--");
             }
-            return; // Exit early
+            return;
           }
 
           // Ensure the loading state is shown for at least 1 second to avoid flicker
@@ -120,7 +135,10 @@ const DirectPayment: React.FC<DirectPaymentProps> = ({
   }, [connected, signer, connectedAddress, amountUsd]);
 
   // Handle wallet connection
-  const handleWalletConnected = (address: string, walletSigner: any) => {
+  const handleWalletConnected = (
+    address: string,
+    walletSigner: ethers.Signer
+  ) => {
     setConnected(true);
     setConnectedAddress(address);
     setSigner(walletSigner);
@@ -175,7 +193,7 @@ const DirectPayment: React.FC<DirectPaymentProps> = ({
 
   // Process payment
   const handlePayNow = async () => {
-    if (!connected || !signer || !recipientAddress || disabled) {
+    if (!connected || !signer?.provider || !recipientAddress || disabled) {
       return;
     }
 
@@ -190,13 +208,12 @@ const DirectPayment: React.FC<DirectPaymentProps> = ({
         const network = await signer.provider.getNetwork();
         const chainId = Number(network.chainId);
 
-        // Check if we're on Polygon
         if (chainId !== 137 && chainId !== 80001) {
           throw new Error(
             "Please switch to the Polygon/MATIC network before making a payment."
           );
         }
-      } catch (networkError) {
+      } catch (networkError: unknown) {
         console.warn("Network detection error:", networkError);
         // Continue anyway, the payment will fail with a more specific error if needed
       }
@@ -205,18 +222,17 @@ const DirectPayment: React.FC<DirectPaymentProps> = ({
       const result = await sendUsdtPayment(signer, recipientAddress, amountUsd);
 
       if (result.success && result.hash) {
-        // Payment succeeded, call the completion handler with the transaction hash
         onPaymentComplete(result.hash);
       } else {
         throw new Error("Payment failed with no error message");
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Payment error:", err);
 
       // Create a user-friendly error message
       let errorMessage = "Payment failed. Please try again.";
 
-      if (err.message) {
+      if (isEthereumError(err)) {
         if (err.message.includes("insufficient funds")) {
           errorMessage =
             "Insufficient USDT balance. Please add more USDT to your wallet.";
@@ -226,17 +242,16 @@ const DirectPayment: React.FC<DirectPaymentProps> = ({
         } else if (err.message.includes("switch to the Polygon")) {
           errorMessage =
             "Please switch to the Polygon/MATIC network to make your payment.";
-        } else if (err.code === "CALL_EXCEPTION") {
+        } else if ("code" in err && err.code === "CALL_EXCEPTION") {
           errorMessage =
             "Contract call failed. Please ensure you're on the Polygon network.";
         } else {
-          // Use the error message but format it nicely
           errorMessage = `Error: ${err.message}`;
         }
       }
 
       setError(errorMessage);
-      onPaymentError(err);
+      onPaymentError(err instanceof Error ? err : new Error(errorMessage));
     } finally {
       setProcessing(false);
     }

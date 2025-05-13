@@ -425,14 +425,43 @@ export default function PaymentForm({
   );
 
   const handleMoreTime = useCallback(() => {
-    setTimeLeft(TIMER_DURATION);
+    // Clear any existing timer
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
+    // Reset timer to full duration
+    const newTimeLeft = TIMER_DURATION;
+    setTimeLeft(newTimeLeft);
     setTimerActive(true);
     setError(null);
+
+    // Update localStorage
     if (typeof window !== "undefined") {
-      localStorage.setItem("paymentTimeLeft", TIMER_DURATION.toString());
+      localStorage.setItem("paymentTimeLeft", newTimeLeft.toString());
       localStorage.setItem("paymentTimerActive", "true");
       localStorage.setItem("paymentStep", "2");
     }
+
+    // Start a new timer interval
+    timerIntervalRef.current = setInterval(() => {
+      setTimeLeft((prevTime) => {
+        const newTime = prevTime - 1;
+        if (newTime <= 0) {
+          clearInterval(timerIntervalRef.current!);
+          timerIntervalRef.current = null;
+          setTimerActive(false);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("paymentTimerActive", "false");
+            localStorage.setItem("paymentTimeLeft", "0");
+          }
+          setError("Payment window expired. Please request more time.");
+          return 0;
+        }
+        return newTime;
+      });
+    }, 1000);
   }, []);
 
   const handlePasteTransactionHash = useCallback(async () => {
@@ -529,6 +558,13 @@ export default function PaymentForm({
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+
+      // Only check timer on step 2
+      if (step === 2 && !timerActive) {
+        setError("Payment window expired. Please request more time.");
+        return;
+      }
+
       setError(null);
       setLoading(true);
 
@@ -584,12 +620,6 @@ export default function PaymentForm({
             localStorage.setItem("paymentStep", "2");
           }
 
-          setLoading(false);
-          return;
-        }
-
-        if (!timerActive) {
-          setError("Payment window expired. Please request more time.");
           setLoading(false);
           return;
         }
@@ -742,7 +772,6 @@ export default function PaymentForm({
         }, 7000);
       } finally {
         setLoading(false);
-        // Clear direct payment processing state if it was active
         setDirectPaymentProcessing(false);
       }
     },
@@ -1219,7 +1248,7 @@ export default function PaymentForm({
               totalUsdAmountDue={totalUsdAmountDue}
               processingFee={processingFee}
               storeError={storeError}
-              effectiveWalletAddress={effectiveWalletAddress}
+              effectiveWalletAddress={effectiveWalletAddress || null}
             />
           )}
 
@@ -1271,6 +1300,14 @@ export default function PaymentForm({
                   Make a payment manually using your wallet app and paste the
                   transaction hash below.
                 </p>
+                {!timerActive && (
+                  <div className="mt-2 bg-red-50 p-3 rounded-lg">
+                    <p className="text-red-700 text-sm flex items-center gap-2">
+                      <span>⚠️</span> Payment window has expired. Please request
+                      more time to proceed.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <PaymentCompleteStep
@@ -1279,7 +1316,7 @@ export default function PaymentForm({
                 handleSubmit={handleSubmit}
                 loading={loading || directPaymentProcessing}
                 error={error}
-                effectiveWalletAddress={effectiveWalletAddress}
+                effectiveWalletAddress={effectiveWalletAddress || null}
                 totalAmountDue={totalAmountDue}
                 totalUsdAmountDue={totalUsdAmountDue}
                 processingFee={processingFee}
@@ -1288,6 +1325,7 @@ export default function PaymentForm({
                 handlePasteTransactionHash={handlePasteTransactionHash}
                 resetSession={resetSession}
                 storeError={storeError}
+                disabled={!timerActive}
               />
             </>
           )}
