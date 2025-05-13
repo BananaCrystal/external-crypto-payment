@@ -6,7 +6,7 @@ const RETRY_DELAY_MS = 1000;
 // Add decryption utility
 const decryptApiKey = (encryptedKey: string): string => {
   const ENCRYPTION_KEY =
-    process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "your-fallback-encryption-key";
+    process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "fallback-encryption-key";
   const bytes = CryptoJS.AES.decrypt(encryptedKey, ENCRYPTION_KEY);
   return bytes.toString(CryptoJS.enc.Utf8);
 };

@@ -1,1 +1,110 @@
- 
+{
+  "name": "Banana Crystal Payments",
+  "version": "1.0.0",
+  "description": "Accept stablecoin payments (USDT) directly in your GoHighLevel account with automated contact management and payment tracking.",
+  "author": "Banana Crystal",
+  "website": "https://bananacrystal.com",
+  "supportEmail": "support@bananacrystal.com",
+  "supportPhone": "+1234567890",
+  "supportWebsite": "https://bananacrystal.com/support",
+  "categories": ["Payments", "CRM", "Automation"],
+  "icon": "https://bananacrystal.com/icon.png",
+  "logo": "https://bananacrystal.com/logo.png",
+  "screenshots": [
+    {
+      "title": "Payment Form",
+      "url": "https://bananacrystal.com/screenshots/payment-form.png"
+    },
+    {
+      "title": "Dashboard",
+      "url": "https://bananacrystal.com/screenshots/dashboard.png"
+    },
+    {
+      "title": "Settings",
+      "url": "https://bananacrystal.com/screenshots/settings.png"
+    }
+  ],
+  "scopes": [
+    "contacts.readonly",
+    "contacts.write",
+    "tags.readonly",
+    "tags.write",
+    "customFields.readonly",
+    "customFields.write",
+    "opportunities.readonly",
+    "opportunities.write"
+  ],
+  "auth": {
+    "type": "oauth2",
+    "authorizeUrl": "https://marketplace.gohighlevel.com/oauth/chooselocation",
+    "tokenUrl": "https://services.gohighlevel.com/oauth/token",
+    "scopes": [
+      "contacts.readonly",
+      "contacts.write",
+      "tags.readonly",
+      "tags.write",
+      "customFields.readonly",
+      "customFields.write",
+      "opportunities.readonly",
+      "opportunities.write"
+    ]
+  },
+  "entryPoints": {
+    "payment": {
+      "url": "https://your-domain.com/pay",
+      "title": "Payment Form"
+    },
+    "settings": {
+      "url": "https://your-domain.com/settings",
+      "title": "Payment Settings"
+    }
+  },
+  "webhooks": {
+    "url": "https://your-domain.com/api/ghl/webhook",
+    "events": [
+      "contact.created",
+      "contact.updated",
+      "contact.deleted",
+      "opportunity.created",
+      "opportunity.updated",
+      "opportunity.deleted"
+    ]
+  },
+  "testAccount": {
+    "email": "ghl-review@bananacrystal.com",
+    "password": "Test@123456",
+    "apiKey": "test_api_key_789",
+    "locationId": "test_location_123"
+  },
+  "documentation": {
+    "setup": "https://bananacrystal.com/docs/setup",
+    "api": "https://bananacrystal.com/docs/api",
+    "webhooks": "https://bananacrystal.com/docs/webhooks",
+    "faq": "https://bananacrystal.com/docs/faq"
+  },
+  "privacyPolicy": "https://bananacrystal.com/privacy",
+  "termsOfService": "https://bananacrystal.com/terms",
+  "pricing": {
+    "free": {
+      "name": "Basic",
+      "price": 0,
+      "features": [
+        "Basic payment processing",
+        "Contact management",
+        "Standard tags",
+        "Email support"
+      ]
+    },
+    "pro": {
+      "name": "Professional",
+      "price": 29.99,
+      "features": [
+        "Advanced payment processing",
+        "Custom fields",
+        "Advanced tagging",
+        "Priority support",
+        "Analytics dashboard"
+      ]
+    }
+  }
+}
