@@ -559,8 +559,8 @@ export default function PaymentForm({
     async (e: React.FormEvent) => {
       e.preventDefault();
 
-      // Add timer check at the start of submission
-      if (!timerActive) {
+      // Only check timer on step 2
+      if (step === 2 && !timerActive) {
         setError("Payment window expired. Please request more time.");
         return;
       }
@@ -1248,7 +1248,7 @@ export default function PaymentForm({
               totalUsdAmountDue={totalUsdAmountDue}
               processingFee={processingFee}
               storeError={storeError}
-              effectiveWalletAddress={effectiveWalletAddress}
+              effectiveWalletAddress={effectiveWalletAddress || null}
             />
           )}
 
@@ -1316,7 +1316,7 @@ export default function PaymentForm({
                 handleSubmit={handleSubmit}
                 loading={loading || directPaymentProcessing}
                 error={error}
-                effectiveWalletAddress={effectiveWalletAddress}
+                effectiveWalletAddress={effectiveWalletAddress || null}
                 totalAmountDue={totalAmountDue}
                 totalUsdAmountDue={totalUsdAmountDue}
                 processingFee={processingFee}
