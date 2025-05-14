@@ -46,7 +46,7 @@ export default function StoreIntegration() {
   const [formData, setFormData] = useState<StoreDetails>({
     store_id: "",
     amount: "",
-    currency: "NGN",
+    currency: "EUR",
     description: "",
     product_name: "",
     redirect_url: "",
