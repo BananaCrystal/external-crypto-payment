@@ -172,8 +172,11 @@ export const PaymentDetailsStep: React.FC<PaymentDetailsStepProps> = ({
               className={`${baseSelectClasses} rounded-r-none border-r-0 w-24`}
               disabled={loading}
             >
-              {COUNTRY_CODES.map((country) => (
-                <option key={country.code} value={country.code}>
+              {COUNTRY_CODES.map((country, index) => (
+                <option
+                  key={`${country.code}-${country.country}`}
+                  value={country.code}
+                >
                   {country.code}
                 </option>
               ))}
