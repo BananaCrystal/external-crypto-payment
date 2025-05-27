@@ -1093,7 +1093,7 @@ export default function PaymentForm({
                 <div className="flex justify-between items-center">
                   <span className="text-purple-200">USDT:</span>
                   <span className="font-bold text-white">
-                    ${formatCurrency(totalUsdAmountDue.toFixed(2))}
+                    ${formatCurrency(formData.usd_amount)}
                   </span>
                 </div>
               </div>
