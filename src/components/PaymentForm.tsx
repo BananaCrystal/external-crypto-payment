@@ -1075,30 +1075,6 @@ export default function PaymentForm({
               )}
             </div>
 
-            {/* Transaction Description */}
-            <div className="text-center mb-6">
-              <h3 className="text-xl font-semibold text-purple-100 mb-2">
-                Transaction Details
-              </h3>
-              <p className="text-purple-200 text-base italic">
-                {description || "Secure cryptocurrency payment"}
-              </p>
-              {/* <div className="mt-3 bg-purple-600/20 rounded-lg p-3">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-purple-200">Amount:</span>
-                  <span className="font-bold text-white">
-                    {formatCurrency(formData.amount)} {formData.currency}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-purple-200">USDT:</span>
-                  <span className="font-bold text-white">
-                    ${formatCurrency(formData.usd_amount)}
-                  </span>
-                </div>
-              </div> */}
-            </div>
-
             {/* Quick Instructions */}
             <div className="mb-6">
               <h3 className="text-xl font-semibold text-purple-100 mb-3">
@@ -1236,6 +1212,7 @@ export default function PaymentForm({
           {step === 1 && (
             <PaymentDetailsStep
               formData={formData}
+              description={description}
               setFormData={setFormData}
               handleInputChange={handleInputChange}
               countryCode={countryCode}
@@ -1311,6 +1288,7 @@ export default function PaymentForm({
               </div>
 
               <PaymentCompleteStep
+                description={description}
                 formData={formData}
                 handleInputChange={handleInputChange}
                 handleSubmit={handleSubmit}

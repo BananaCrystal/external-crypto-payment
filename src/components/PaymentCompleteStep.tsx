@@ -22,6 +22,7 @@ interface PaymentCompleteStepProps {
   totalUsdAmountDue: number;
   processingFee: number;
   processingFeeUsd: number;
+  description: string;
   copyToClipboard: (text: string | null | undefined) => void;
   handlePasteTransactionHash: () => void;
   resetSession: () => void;
@@ -47,6 +48,7 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
   totalAmountDue,
   totalUsdAmountDue,
   processingFee,
+  description,
   processingFeeUsd,
   copyToClipboard,
   handlePasteTransactionHash,
@@ -79,6 +81,12 @@ export const PaymentCompleteStep: React.FC<PaymentCompleteStepProps> = ({
 
       {/* Description and Amount Summary with Fee */}
       <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 mb-6 text-sm space-y-2">
+        <div className="flex justify-between">
+          <span className="text-gray-600">Description:</span>
+          <span className="font-bold text-gray-900">
+            {description || "Secure cryptocurrency payment"}
+          </span>
+        </div>
         <div className="flex justify-between">
           <span className="text-gray-600">Original Amount:</span>
           <span className="font-bold text-gray-900">

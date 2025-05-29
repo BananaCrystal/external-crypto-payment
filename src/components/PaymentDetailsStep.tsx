@@ -18,15 +18,16 @@ interface PaymentDetailsStepProps {
   ) => void;
   countryCode: string;
   setCountryCode: React.Dispatch<React.SetStateAction<string>>;
-  handleSubmit: (e: React.FormEvent) => Promise<void>; // Pass the submit handler down
+  handleSubmit: (e: React.FormEvent) => Promise<void>; 
   loading: boolean;
   error: string | null;
-  canProceedToPayment: boolean; // Whether a payment address is available
-  totalAmountDue: number; // Calculated fees
-  totalUsdAmountDue: number; // Calculated fees
-  processingFee: number; // Calculated fee amount
-  storeError: string | null; // Store API fetch error (for warning message)
-  effectiveWalletAddress: string | null | undefined; // Needed for warning message condition
+  description: string;
+  canProceedToPayment: boolean; 
+  totalAmountDue: number; 
+  totalUsdAmountDue: number; 
+  processingFee: number; 
+  storeError: string | null; 
+  effectiveWalletAddress: string | null | undefined; 
 }
 
 export const PaymentDetailsStep: React.FC<PaymentDetailsStepProps> = ({
@@ -37,6 +38,7 @@ export const PaymentDetailsStep: React.FC<PaymentDetailsStepProps> = ({
   setCountryCode,
   handleSubmit,
   loading,
+  description,
   error,
   canProceedToPayment,
   totalAmountDue,
@@ -71,6 +73,12 @@ export const PaymentDetailsStep: React.FC<PaymentDetailsStepProps> = ({
       <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {/* Amount Details Summary with Fee */}
         <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 text-sm space-y-2">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Description:</span>
+            <span className="font-bold text-gray-900">
+              {description || "Secure cryptocurrency payment"}
+            </span>
+          </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Original Amount:</span>
             <span className="font-bold text-gray-900">
