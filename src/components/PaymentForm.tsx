@@ -1083,7 +1083,7 @@ export default function PaymentForm({
               <p className="text-purple-200 text-base italic">
                 {description || "Secure cryptocurrency payment"}
               </p>
-              <div className="mt-3 bg-purple-600/20 rounded-lg p-3">
+              {/* <div className="mt-3 bg-purple-600/20 rounded-lg p-3">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-purple-200">Amount:</span>
                   <span className="font-bold text-white">
@@ -1096,7 +1096,7 @@ export default function PaymentForm({
                     ${formatCurrency(formData.usd_amount)}
                   </span>
                 </div>
-              </div>
+              </div> */}
             </div>
 
             {/* Quick Instructions */}
