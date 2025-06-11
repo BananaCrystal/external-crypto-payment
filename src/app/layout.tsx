@@ -13,7 +13,7 @@ export const metadata = {
     siteName: "BananaCrystal External Payment",
     images: [
       {
-        url: "http://www.bananacrystal.com/wp-content/uploads/2025/06/Image-Color-Scheme-Request.png",
+        url: "http://www.bananacrystal.com/wp-content/uploads/2025/06/Screenshot-2025-06-11-at-09.13.22.png",
         width: 1200,
         height: 630,
         alt: "BananaCrystal External Payment Open Graph Image",
