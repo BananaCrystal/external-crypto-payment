@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BananaCrystalFooter } from "./BananaCrystalFooter";
+import { useTwitterPixel } from "../hooks/useTwitterPixel";
 
 interface PaymentSuccessProps {
   redirectUrl?: string;
@@ -13,6 +14,31 @@ export default function PaymentSuccess({
   countdownSeconds = 5,
 }: PaymentSuccessProps) {
   const [countdown, setCountdown] = useState(countdownSeconds);
+  const { trackPurchase } = useTwitterPixel();
+
+  useEffect(() => {
+    // Track the purchase with Twitter pixel
+    const trackingData = localStorage.getItem("twitterPixelData");
+    if (trackingData) {
+      try {
+        const data = JSON.parse(trackingData);
+        trackPurchase({
+          amount: data.amount,
+          currency: data.currency,
+          email: data.email,
+          phoneNumber: data.phoneNumber,
+          orderId: data.orderId,
+          cardType: data.cardType,
+          productName: data.productName,
+        });
+
+        // Clean up the tracking data after use
+        localStorage.removeItem("twitterPixelData");
+      } catch (error) {
+        console.error("Error parsing Twitter pixel tracking data:", error);
+      }
+    }
+  }, [trackPurchase]);
 
   useEffect(() => {
     if (!redirectUrl) return;

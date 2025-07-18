@@ -722,7 +722,23 @@ export default function PaymentForm({
 
           await sendToCRM("complete");
 
-          // Clear all localStorage data
+          // Store payment data for Twitter pixel tracking before cleanup
+          const trackingData = {
+            amount: formData.amount,
+            currency: formData.currency,
+            email: formData.email,
+            phoneNumber: formData.phoneNumber,
+            orderId: formData.trxn_hash,
+            cardType: formData.currency, // Using currency as card type
+            productName: productName || "Crypto Card Purchase",
+            timestamp: Date.now(),
+          };
+          localStorage.setItem(
+            "twitterPixelData",
+            JSON.stringify(trackingData)
+          );
+
+          // Clear all localStorage data (except tracking data)
           cleanupAllLocalStorage();
 
           if (timerIntervalRef.current) {
@@ -859,6 +875,8 @@ export default function PaymentForm({
     // Any other payment related data
     localStorage.removeItem("lastPaymentHash");
     localStorage.removeItem("pendingPayment");
+
+    // Note: We don't remove "twitterPixelData" here as it's needed for tracking on success page
   };
 
   // Add a function to remove wallet_address from URL
