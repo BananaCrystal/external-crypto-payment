@@ -5,7 +5,7 @@ export interface StoreDetails {
   store_support_email: string | null;
   store_payment_email: string | null;
   store_url: string | null;
-  wallet_address: string | null; // This is key - fetched from API
+  wallet_address: string | null; 
   store_logo: string | null;
 }
 
