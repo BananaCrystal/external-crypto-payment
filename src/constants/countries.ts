@@ -104,7 +104,7 @@ export const CURRENCIES = [
   { code: "PEN", name: "Peruvian Sol" },
   { code: "UYU", name: "Uruguayan Peso" },
   { code: "PYG", name: "Paraguayan Guaraní" },
-  // { code: "VES", name: "Venezuelan Bolívar Soberano" }, // Removed
+  { code: "VES", name: "Venezuelan Bolívar Soberano" },
   { code: "GYD", name: "Guyanese Dollar" },
   { code: "SRD", name: "Surinamese Dollar" },
 
