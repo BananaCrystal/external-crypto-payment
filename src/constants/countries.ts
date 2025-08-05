@@ -62,11 +62,13 @@ export const COUNTRY_CODES = [
   { code: "+82", country: "South Korea" },
   { code: "+34", country: "Spain" },
   { code: "+46", country: "Sweden" },
+  { code: "+963", country: "Syria" },
   { code: "+255", country: "Tanzania" },
   { code: "+66", country: "Thailand" },
   { code: "+228", country: "Togo" },
   { code: "+216", country: "Tunisia" },
   { code: "+256", country: "Uganda" },
+  { code: "+380", country: "Ukraine" },
   { code: "+971", country: "United Arab Emirates" },
   { code: "+44", country: "United Kingdom" },
   { code: "+1", country: "United States" },
@@ -125,7 +127,7 @@ export const CURRENCIES = [
   { code: "BAM", name: "Bosnia and Herzegovina Convertible Mark" },
   { code: "RSD", name: "Serbian Dinar" },
   { code: "MDL", name: "Moldovan Leu" },
-  // { code: "UAH", name: "Ukrainian Hryvnia" }, // Removed
+  { code: "UAH", name: "Ukrainian Hryvnia" },
 
   // Africa
   { code: "NGN", name: "Nigerian Naira" },
@@ -196,6 +198,7 @@ export const CURRENCIES = [
   { code: "JOD", name: "Jordanian Dinar" },
   { code: "LBP", name: "Lebanese Pound" },
   // { code: "IQD", name: "Iraqi Dinar" }, // Removed
+  { code: "SYP", name: "Syrian Pound" },
   { code: "YER", name: "Yemeni Rial" },
   { code: "ILS", name: "Israeli New Shekel" },
 
