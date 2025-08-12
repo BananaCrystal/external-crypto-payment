@@ -22,6 +22,7 @@ import { BananaCrystalFooter } from "./BananaCrystalFooter";
 import { PaymentDetailsStep } from "./PaymentDetailsStep";
 import { PaymentCompleteStep } from "./PaymentCompleteStep";
 import DirectPayment from "./DirectPayment";
+import { ExistingAccountModal } from "./ExistingAccountModal";
 
 // Add these animation classes to style section
 const animationStyles = `
@@ -190,6 +191,16 @@ export default function PaymentForm({
   const [directPaymentError, setDirectPaymentError] = useState<string | null>(
     null
   );
+
+  // State for existing account modal
+  const [showAccountModal, setShowAccountModal] = useState(() => {
+    if (typeof window !== "undefined") {
+      // Check if user has already seen the modal in this session
+      const hasSeenModal = sessionStorage.getItem("hasSeenAccountModal");
+      return !hasSeenModal;
+    }
+    return true;
+  });
 
   // Effect to fetch store details
   useEffect(() => {
@@ -553,6 +564,31 @@ export default function PaymentForm({
     // Reset direct payment states
     setDirectPaymentProcessing(false);
     setDirectPaymentError(null);
+  }, []);
+
+  // Handlers for the existing account modal
+  const handleCloseAccountModal = useCallback(() => {
+    setShowAccountModal(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("hasSeenAccountModal", "true");
+    }
+  }, []);
+
+  const handleNoAccount = useCallback(() => {
+    // User is new to BananaCrystal, continue with the normal flow
+    setShowAccountModal(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("hasSeenAccountModal", "true");
+    }
+  }, []);
+
+  const handleHasAccount = useCallback(() => {
+    // This will be handled by the modal component itself (redirect to BananaCrystal app)
+    // We just close the modal and mark it as seen
+    setShowAccountModal(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("hasSeenAccountModal", "true");
+    }
   }, []);
 
   const handleSubmit = useCallback(
@@ -1001,6 +1037,14 @@ export default function PaymentForm({
   // So if we reach here, it's safe to render.
   return (
     <div className="max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+      {/* Existing Account Modal */}
+      <ExistingAccountModal
+        isOpen={showAccountModal}
+        onClose={handleCloseAccountModal}
+        onNoAccount={handleNoAccount}
+        onHasAccount={handleHasAccount}
+      />
+      
       <div
         className={`bg-white rounded-xl shadow-2xl overflow-hidden md:grid md:grid-cols-2 transform transition-all duration-500 min-h-[600px] border border-[${brandPurple}]`}
       >
