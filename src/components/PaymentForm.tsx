@@ -193,13 +193,15 @@ export default function PaymentForm({
   );
 
   // State for existing account modal
-  const [showAccountModal, setShowAccountModal] = useState(() => {
+  const [showAccountModal, setShowAccountModal] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      // Check if user has already seen the modal in this session
+      // Only show modal for debit card products and if user hasn't seen it this session
       const hasSeenModal = sessionStorage.getItem("hasSeenAccountModal");
-      return !hasSeenModal;
+      const isDebitCardProduct = !!(description && description.toLowerCase().includes("debit card"));
+      return !hasSeenModal && isDebitCardProduct;
     }
-    return true;
+    // Only show for debit card products
+    return !!(description && description.toLowerCase().includes("debit card"));
   });
 
   // Effect to fetch store details
