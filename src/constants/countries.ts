@@ -16,6 +16,7 @@ export const COUNTRY_CODES = [
   { code: "+57", country: "Colombia" },
   { code: "+269", country: "Comoros" },
   { code: "+253", country: "Djibouti" },
+  { code: "+1-809", country: "Dominican Republic" },
   { code: "+20", country: "Egypt" },
   { code: "+240", country: "Equatorial Guinea" },
   { code: "+291", country: "Eritrea" },
