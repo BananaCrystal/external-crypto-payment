@@ -1,7 +1,7 @@
 on:
   workflow_dispatch:
   push:
-    branches: [ 'add-spot' ]
+    branches: [ 'staging' ]
 
 jobs:
   build-staging-external-crypto-payment:
