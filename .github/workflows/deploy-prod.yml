@@ -37,20 +37,17 @@ jobs:
       - name: docker push
         run: |
           docker push ${{ env.DOCKER_IMAGE }}
-      - name: deploy
-        uses: silinternational/ecs-deploy@master
-        with:
-          aws_access_key_cmd: --aws-access-key
-          aws_access_key: ${{ secrets.PRODUCTION_AWS_ACCESS_KEY_ID}}
-          aws_secret_key_cmd: --aws-secret-key
-          aws_secret_key: ${{ secrets.PRODUCTION_AWS_SECRET_ACCESS_KEY}}
-          cluster_cmd: --cluster
-          cluster: 'prod-cluster'
-          image_cmd: --image
-          image: ${{ env.DOCKER_IMAGE }}
-          region_cmd: --region
-          region: us-east-2
-          service_name_cmd: --service-name
-          service_name: 'external-crypto-payment'
-          timeout_cmd: --timeout
-          timeout: 600
+      - name: Deploy via ecs-deploy script
+        env:
+          AWS_DEFAULT_REGION: us-east-2
+          CLUSTER: prod-cluster
+          SERVICE: external-crypto-payment
+          IMAGE: ${{ env.DOCKER_IMAGE }}
+        run: |
+          curl -sSL https://raw.githubusercontent.com/silinternational/ecs-deploy/master/ecs-deploy -o ecs-deploy
+          chmod +x ecs-deploy
+          ./ecs-deploy \
+            --cluster "$CLUSTER" \
+            --service-name "$SERVICE" \
+            --image "$IMAGE" \
+            --timeout 600
