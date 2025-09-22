@@ -37,6 +37,13 @@ jobs:
       - name: docker push
         run: |
           docker push ${{ env.DOCKER_IMAGE }}
+      - name: Switch to Spot capacity
+        run: |
+          aws ecs update-service \
+             --cluster stg-cluster \
+             --service external-crypto-payment \
+             --capacity-provider-strategy capacityProvider=cs-spot-cp,weight=1,base=0 \
+             --force-new-deployment
       - name: Deploy via ecs-deploy script
         env:
           AWS_DEFAULT_REGION: us-east-2
@@ -51,3 +58,16 @@ jobs:
             --service-name "$SERVICE" \
             --image "$IMAGE" \
             --timeout 600
+      - name: Wait for ECS service to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster stg-cluster \
+            --services external-crypto-payment
+
+      - name: Revert to On-Demand capacity
+        run: |
+          aws ecs update-service \
+            --cluster stg-cluster \
+            --service external-crypto-payment \
+            --capacity-provider-strategy capacityProvider=ec2-capacity-provider,weight=1,base=1 \
+            --force-new-deployment
